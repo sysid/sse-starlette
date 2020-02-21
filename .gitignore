@@ -1,0 +1,8 @@
+.idea/
+*.pyc
+.coverage
+.pytest_cache/
+*.egg-info/
+__pycache__/
+venv/
+Pipfile.lock
