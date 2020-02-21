@@ -41,5 +41,5 @@ Output:
 
 Run the tests:
 ```python
-./scripts/test
+make test
 ```

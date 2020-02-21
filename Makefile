@@ -5,6 +5,9 @@ TESTDIR       = munggoggo/tests
 MAKEFILE_LIST = /tmp/makefile_list.txt
 MAKE          = make
 
+#VERSION       = `cat sse_starlette/__init__.py | grep __version__ | sed "s/__version__ = //" | sed "s/'//g"`
+VERSION       = $(shell cat sse_starlette/__init__.py | grep __version__ | sed "s/__version__ = //" | sed "s/'//g")
+
 .PHONY: all help clean build
 
 # Put it first so that "make" without argument is like "make help".
@@ -13,10 +16,9 @@ help:
 
 default: all
 
-#all: unit
-all: check clean build
+all: clean build upload tag
 	@echo "--------------------------------------------------------------------------------"
-	@echo "-M- building
+	@echo "-M- building and distributing"
 	@echo "--------------------------------------------------------------------------------"
 
 test:
@@ -28,5 +30,14 @@ clean:
 	rm -rf dist
 
 build:
-	@echo "building and uploading"
-	./scripts/publish
+	@echo "building"
+	python setup.py sdist
+
+upload: build
+	@echo "upload"
+	twine upload --verbose dist/*
+
+tag:
+	@echo "tagging $(VERSION)"
+	git tag -a $(VERSION) -m "version $(VERSION)"
+	git push --tags
