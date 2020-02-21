@@ -31,6 +31,9 @@ clean:
 
 build:
 	@echo "building"
+	git add .
+	git commit
+	git push
 	python setup.py sdist
 
 upload: build
