@@ -1,4 +1,4 @@
-# Server Sent Events for Starlette
+# Server Sent Events for [Starlette](https://github.com/encode/starlette)
 
 Installation:
 
