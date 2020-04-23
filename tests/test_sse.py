@@ -2,10 +2,9 @@ import asyncio
 import logging
 
 import pytest
-
-from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from starlette.testclient import TestClient
 
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
