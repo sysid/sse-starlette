@@ -45,13 +45,13 @@ setup(
     packages=get_packages('sse_starlette'),
     install_requires=[],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Topic :: Internet :: WWW/HTTP',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 )

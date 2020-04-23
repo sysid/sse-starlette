@@ -6,7 +6,7 @@ import io
 import logging
 import re
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, Generator, Optional, Union, Iterator
+from typing import Any, AsyncGenerator, Dict, Generator, Iterator, Optional, Union
 
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
@@ -205,7 +205,7 @@ class EventSourceResponse(Response):
         # To protect against such proxy servers, authors can include a comment line
         # (one starting with a ':' character) every 15 seconds or so.
         while self.active:
-            await asyncio.sleep(self._ping_interval, loop=self._loop)
+            await asyncio.sleep(self._ping_interval)
             ping = ServerSentEvent(f": ping {datetime.utcnow()}").encode()
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
