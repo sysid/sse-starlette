@@ -39,6 +39,28 @@ Output:
 
 **Caveat:** SSE streaming does not work in combination with GZipMiddleware.
 
+Be aware that for proper server shutdown the application must stop all
+running tasks (generators). Otherwise you might experience the following warnings
+at shutdown: `Waiting for background tasks to complete. (CTRL+C to force quit)`.
+
+Client disconnects need to be handled in the Request handler (see example.py):
+```python
+async def endless(req: Request):
+    async def event_publisher():
+        i = 0
+        while True:
+            disconnected = await req.is_disconnected()
+            if disconnected:
+                _log.info(f"Disconnecting client {req.client}")
+                break
+            i += 1
+            yield dict(data=i)
+            await asyncio.sleep(0.2)
+        _log.info(f"Disconnected from client {req.client}")
+
+    return EventSourceResponse(event_publisher())
+```
+
 Run the tests:
 ```python
 make test
