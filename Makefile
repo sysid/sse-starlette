@@ -1,7 +1,7 @@
 # You can set these variables from the command line, and also from the environment for the first two.
 SOURCEDIR     = source
 BUILDDIR      = build
-TESTDIR       = munggoggo/tests
+TESTDIR       = sse_starlette/tests
 MAKEFILE_LIST = /tmp/makefile_list.txt
 MAKE          = make
 

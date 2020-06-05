@@ -12,14 +12,14 @@ _log = logging.getLogger(__name__)
 
 
 async def numbers(minimum, maximum):
-    """ Simulates and limited stremm """
+    """ Simulates and limited stream """
     for i in range(minimum, maximum + 1):
         await asyncio.sleep(0.9)
         yield dict(data=i)
 
 
 async def endless(req: Request):
-    """ Simulates and endless stremm
+    """ Simulates and endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
     to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
@@ -36,15 +36,14 @@ async def endless(req: Request):
             # yield dict(id=..., event=..., data=...)
             i += 1
             yield dict(data=i)
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.9)
         _log.info(f"Disconnected from client {req.client}")
 
     return EventSourceResponse(event_publisher())
 
 
 async def sse(request):
-    # generator = numbers(1, 5)
-    generator = numbers()
+    generator = numbers(1, 5)
     return EventSourceResponse(generator)
 
 
