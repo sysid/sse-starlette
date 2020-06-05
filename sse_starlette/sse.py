@@ -206,6 +206,6 @@ class EventSourceResponse(Response):
         # (one starting with a ':' character) every 15 seconds or so.
         while self.active:
             await asyncio.sleep(self._ping_interval)
-            ping = ServerSentEvent(f": ping {datetime.utcnow()}").encode()
+            ping = ServerSentEvent(datetime.utcnow(), event="ping").encode()
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
