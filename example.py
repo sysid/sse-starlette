@@ -4,11 +4,33 @@ import logging
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
+from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
 from sse_starlette.sse import EventSourceResponse
 
 _log = logging.getLogger(__name__)
+
+html_sse = """
+    <html>
+    <body>
+        <script>
+            var evtSource = new EventSource("/numbers");
+            console.log("evtSource: ", evtSource);
+            evtSource.onmessage = function(e) {
+                document.getElementById('response').innerText = e.data;
+                console.log(e);
+                if (e.data == 20) {
+                    console.log("Closing connection after 20 numbers.")
+                    evtSource.close()
+                }
+            }
+        </script>
+        <h1>Response from server:</h1>
+        <div id="response"></div>
+    </body>
+</html>
+"""
 
 
 async def numbers(minimum, maximum):
@@ -43,12 +65,17 @@ async def endless(req: Request):
 
 
 async def sse(request):
-    generator = numbers(1, 5)
+    generator = numbers(1, 25)
     return EventSourceResponse(generator)
 
 
+async def home(req: Request):
+    return HTMLResponse(html_sse)
+
+
 routes = [
-    Route("/", endpoint=sse),
+    Route("/", endpoint=home),
+    Route("/numbers", endpoint=sse),
     Route("/endless", endpoint=endless),
 ]
 
