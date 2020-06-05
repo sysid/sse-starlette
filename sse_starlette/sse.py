@@ -202,8 +202,8 @@ class EventSourceResponse(Response):
 
     async def _ping(self, send: Send) -> None:
         # Legacy proxy servers are known to, in certain cases, drop HTTP connections after a short timeout.
-        # To protect against such proxy servers, authors can include a comment line
-        # (one starting with a ':' character) every 15 seconds or so.
+        # To protect against such proxy servers, authors can send a custom (ping) event 
+        # every 15 seconds or so.
         while self.active:
             await asyncio.sleep(self._ping_interval)
             ping = ServerSentEvent(datetime.utcnow(), event="ping").encode()
