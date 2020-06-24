@@ -42,6 +42,7 @@ setup(
     long_description_content_type='text/markdown',
     author='sysid',
     author_email='sysid@gmx.de',
+    package_data={"sse_starlette": ["py.typed"]},
     packages=get_packages('sse_starlette'),
     install_requires=[],
     classifiers=[
