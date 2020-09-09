@@ -1,5 +1,7 @@
 # Server Sent Events for [Starlette](https://github.com/encode/starlette)
 
+Background: https://sysid.github.io/sse/
+
 Installation:
 
 ```shell
