@@ -39,7 +39,7 @@ if __name__ == "__main__":
 Output:  
 ![output](output.png)
 
-**Caveat:** SSE streaming does not work in combination with GZipMiddleware.
+**Caveat:** SSE streaming does not work in combination with [GZipMiddleware](https://github.com/encode/starlette/issues/20#issuecomment-704106436).
 
 Be aware that for proper server shutdown the application must stop all
 running tasks (generators). Otherwise you might experience the following warnings
