@@ -8,6 +8,17 @@ from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
+"""
+Integration test for lost client connection:
+
+1. start example.py with log_level='trace'
+2. curl http://localhost:8000/endless
+3. kill curl
+
+expected outcome:
+all streaming stops, including pings (log output)
+"""
+
 
 @pytest.mark.parametrize(
     "input,expected",
@@ -30,7 +41,8 @@ def test_sync_event_source_response(input, expected):
                     yield dict(data=i, event="message")
 
         generator = numbers(1, 5)
-        response = EventSourceResponse(generator, ping=0.2)
+        # noinspection PyTypeChecker
+        response = EventSourceResponse(generator, ping=0.2)  # type: ignore
         await response(scope, receive, send)
 
     client = TestClient(app)

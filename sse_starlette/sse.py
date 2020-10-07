@@ -3,17 +3,15 @@ import contextlib
 import enum
 import inspect
 import io
-import logging
 import re
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, Generator, Iterator, Optional, Union
+from typing import Any, Optional, Union
 
 from starlette.background import BackgroundTask
-from starlette.concurrency import iterate_in_threadpool
+from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
-
-_log = logging.getLogger(__name__)
+from uvicorn.config import logger as _log
 
 
 class SseState(enum.Enum):
@@ -80,9 +78,9 @@ class ServerSentEvent:
 
 
 class EventSourceResponse(Response):
-    """ Implements the ServerSentEvent Protocol: https://www.w3.org/TR/2009/WD-eventsource-20090421/
+    """Implements the ServerSentEvent Protocol: https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
-        Responses must not be compressed by middleware in order to work properly.
+    Responses must not be compressed by middleware in order to work properly.
     """
 
     DEFAULT_PING_INTERVAL = 15
@@ -132,7 +130,28 @@ class EventSourceResponse(Response):
         self._loop = asyncio.get_event_loop()
         self._ping_task = None
 
+    @staticmethod
+    async def listen_for_disconnect(receive: Receive) -> None:
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                _log.debug(f"Got event: http.disconnect. Stop streaming.")
+                break
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await run_until_first_complete(
+            (self.stream_response, {"send": send}),
+            (self.listen_for_disconnect, {"receive": receive}),
+        )
+
+        self.stop_streaming()
+        await self.wait()
+        _log.debug(f"streaming stopped.")
+
+        if self.background is not None:  # pragma: no cover, tested in StreamResponse
+            await self.background()
+
+    async def stream_response(self, send) -> None:
         await send(
             {
                 "type": "http.response.start",
@@ -140,9 +159,7 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
-
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
-
         async for data in self.body_iterator:
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
@@ -150,14 +167,7 @@ class EventSourceResponse(Response):
                 chunk = ServerSentEvent(str(data), sep=self.sep).encode()
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
-
-        self.stop_streaming()
-        await self.wait()
-        _log.debug(f"streaming stopped.")
         await send({"type": "http.response.body", "body": b"", "more_body": False})
-
-        if self.background is not None:  # pragma: no cover, tested in StreamResponse
-            await self.background()
 
     async def wait(self) -> None:
         """EventSourceResponse object is used for streaming data to the client,

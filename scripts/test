@@ -10,4 +10,4 @@ set -x
 
 PYTHONPATH=. ${PREFIX}pytest --ignore venv --cov=$PACKAGE --cov=tests --cov-report=term-missing ${@}
 ${PREFIX}black $PACKAGE tests --check
-${PREFIX}isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as --line-width 88 --recursive --check-only $PACKAGE tests
+${PREFIX}isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as --line-width 88 --check-only $PACKAGE tests

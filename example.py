@@ -1,6 +1,4 @@
 import asyncio
-import logging
-
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -9,7 +7,7 @@ from starlette.routing import Route
 
 from sse_starlette.sse import EventSourceResponse
 
-_log = logging.getLogger(__name__)
+from uvicorn.config import logger as _log
 
 html_sse = """
     <html>
@@ -41,7 +39,7 @@ async def numbers(minimum, maximum):
 
 
 async def endless(req: Request):
-    """ Simulates and endless stream
+    """Simulates and endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
     to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
@@ -82,4 +80,4 @@ routes = [
 app = Starlette(debug=True, routes=routes)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level='info')
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace")
