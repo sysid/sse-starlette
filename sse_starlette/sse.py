@@ -171,7 +171,7 @@ class EventSourceResponse(Response):
 
     async def wait(self) -> None:
         """EventSourceResponse object is used for streaming data to the client,
-        this method returns future, so we can wain until connection will
+        this method returns future, so we can wait until connection will
         be closed or other task explicitly call ``stop_streaming`` method.
         """
         if self._ping_task is None:
