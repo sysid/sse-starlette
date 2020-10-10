@@ -14,8 +14,8 @@ from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
 try:
-    import uvicorn
-    from uvicorn.config import logger as _log
+    import uvicorn  # type: ignore
+    from uvicorn.config import logger as _log  # type: ignore
 except ModuleNotFoundError:
     _log = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
