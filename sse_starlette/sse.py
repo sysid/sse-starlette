@@ -12,6 +12,22 @@ from starlette.concurrency import iterate_in_threadpool, run_until_first_complet
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 from uvicorn.config import logger as _log
+from uvicorn.main import Server
+
+original_handler = Server.handle_exit
+
+
+# https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
+class AppStatus:
+    should_exit = False
+
+    @staticmethod
+    def handle_exit(*args, **kwargs):
+        AppStatus.should_exit = True
+        original_handler(*args, **kwargs)
+
+
+Server.handle_exit = AppStatus.handle_exit
 
 
 class SseState(enum.Enum):
@@ -22,13 +38,13 @@ class SseState(enum.Enum):
 
 class ServerSentEvent:
     def __init__(
-        self,
-        data: Any,
-        *,
-        event: Optional[str] = None,
-        id: Optional[int] = None,
-        retry: Optional[int] = None,
-        sep: str = None,
+            self,
+            data: Any,
+            *,
+            event: Optional[str] = None,
+            id: Optional[int] = None,
+            retry: Optional[int] = None,
+            sep: str = None,
     ) -> None:
         self.data = data
         self.event = event
@@ -86,19 +102,19 @@ class EventSourceResponse(Response):
     DEFAULT_PING_INTERVAL = 15
 
     def __init__(
-        self,
-        content: Any,
-        # content: Iterator[Any],
-        # content: Union[
-        #     Generator[Union[str, Dict], None, None],
-        #     AsyncGenerator[Union[str, Dict], None],
-        # ],
-        status_code: int = 200,
-        headers: dict = None,
-        media_type: str = "text/html",
-        background: BackgroundTask = None,
-        ping: int = None,
-        sep: str = None,
+            self,
+            content: Any,
+            # content: Iterator[Any],
+            # content: Union[
+            #     Generator[Union[str, Dict], None, None],
+            #     AsyncGenerator[Union[str, Dict], None],
+            # ],
+            status_code: int = 200,
+            headers: dict = None,
+            media_type: str = "text/html",
+            background: BackgroundTask = None,
+            ping: int = None,
+            sep: str = None,
     ) -> None:
         self.sep = sep
         if inspect.isasyncgen(content):
@@ -159,8 +175,13 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
+
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
+
         async for data in self.body_iterator:
+            if AppStatus.should_exit:
+                _log.debug(f"Caught signal. Stopping stream_response loop.")
+                break
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
             else:
