@@ -3,6 +3,7 @@ import contextlib
 import enum
 import inspect
 import io
+import logging
 import re
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -11,7 +12,13 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
-from uvicorn.config import logger as _log
+
+try:
+    import uvicorn
+    from uvicorn.config import logger as _log
+except ModuleNotFoundError:
+    _log = logging.getLogger(__name__)
+    logging.basicConfig(level=logging.INFO)
 
 
 class SseState(enum.Enum):
@@ -30,16 +37,6 @@ class ServerSentEvent:
         retry: Optional[int] = None,
         sep: str = None,
     ) -> None:
-        self.data = data
-        self.event = event
-        self.id = id
-        self.retry = retry
-
-        self.DEFAULT_SEPARATOR = "\r\n"
-        self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
-        self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
-
-    def encode(self) -> bytes:
         """Send data using EventSource protocol
 
         :param str data: The data field for the message.
@@ -54,6 +51,16 @@ class ServerSentEvent:
             specifying the reconnection time in milliseconds. If a non-integer
             value is specified, the field is ignored.
         """
+        self.data = data
+        self.event = event
+        self.id = id
+        self.retry = retry
+
+        self.DEFAULT_SEPARATOR = "\r\n"
+        self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
+        self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
+
+    def encode(self) -> bytes:
         buffer = io.StringIO()
         if self.id is not None:
             buffer.write(self.LINE_SEP_EXPR.sub("", f"id: {self.id}"))
@@ -159,7 +166,9 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
+
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
+
         async for data in self.body_iterator:
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
