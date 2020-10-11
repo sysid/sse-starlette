@@ -3,6 +3,7 @@ import contextlib
 import enum
 import inspect
 import io
+import logging
 import re
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -46,16 +47,6 @@ class ServerSentEvent:
             retry: Optional[int] = None,
             sep: str = None,
     ) -> None:
-        self.data = data
-        self.event = event
-        self.id = id
-        self.retry = retry
-
-        self.DEFAULT_SEPARATOR = "\r\n"
-        self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
-        self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
-
-    def encode(self) -> bytes:
         """Send data using EventSource protocol
 
         :param str data: The data field for the message.
@@ -70,6 +61,16 @@ class ServerSentEvent:
             specifying the reconnection time in milliseconds. If a non-integer
             value is specified, the field is ignored.
         """
+        self.data = data
+        self.event = event
+        self.id = id
+        self.retry = retry
+
+        self.DEFAULT_SEPARATOR = "\r\n"
+        self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
+        self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
+
+    def encode(self) -> bytes:
         buffer = io.StringIO()
         if self.id is not None:
             buffer.write(self.LINE_SEP_EXPR.sub("", f"id: {self.id}"))

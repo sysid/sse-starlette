@@ -1,3 +1,5 @@
+dist/
+tags
 .idea/
 *.pyc
 .coverage
