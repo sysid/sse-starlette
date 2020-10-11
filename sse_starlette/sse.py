@@ -3,7 +3,6 @@ import contextlib
 import enum
 import inspect
 import io
-import logging
 import re
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -12,10 +11,9 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
-from uvicorn.config import logger as _log
-from uvicorn.main import Server
 
-original_handler = Server.handle_exit
+USE_UVICORN = True
+original_handler = lambda *args, **kwargs: None
 
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
@@ -28,7 +26,17 @@ class AppStatus:
         original_handler(*args, **kwargs)
 
 
-Server.handle_exit = AppStatus.handle_exit
+if USE_UVICORN:
+    from uvicorn.config import logger as _log
+    from uvicorn.main import Server
+
+    original_handler = Server.handle_exit
+    Server.handle_exit = AppStatus.handle_exit
+
+else:
+    from uvicorn.config import logger as _log  # TODO: remove
+    # _log = logging.getLogger(__name__)
+    # logging.basicConfig(level=logging.INFO)
 
 
 class SseState(enum.Enum):
