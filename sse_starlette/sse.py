@@ -3,6 +3,7 @@ import contextlib
 import enum
 import inspect
 import io
+import logging
 import re
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -12,12 +13,10 @@ from starlette.concurrency import iterate_in_threadpool, run_until_first_complet
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
-USE_UVICORN = True
-original_handler = lambda *args, **kwargs: None
-
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
+    """ helper for monkeypatching the signal-handler of uvicorn """
     should_exit = False
 
     @staticmethod
@@ -26,17 +25,24 @@ class AppStatus:
         original_handler(*args, **kwargs)
 
 
-if USE_UVICORN:
-    from uvicorn.config import logger as _log
+try:
+    from uvicorn.config import logger as _log  # TODO: remove
     from uvicorn.main import Server
 
     original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit
 
-else:
-    from uvicorn.config import logger as _log  # TODO: remove
-    # _log = logging.getLogger(__name__)
-    # logging.basicConfig(level=logging.INFO)
+
+    def unpatch_uvicorn_signal_handler():
+        """ restores original signal-handler and rolls back monkey-patching.
+            Normally this should not be necessary.
+        """
+        Server.handle_exit = original_handler
+
+except ModuleNotFoundError as e:
+    _log = logging.getLogger(__name__)
+    logging.basicConfig(level=logging.INFO)
+    _log.debug(f"Uvicorn not used, falling back to python standard logging.")
 
 
 class SseState(enum.Enum):
@@ -154,6 +160,8 @@ class EventSourceResponse(Response):
 
         self._loop = asyncio.get_event_loop()
         self._ping_task = None
+
+        _ = None
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:

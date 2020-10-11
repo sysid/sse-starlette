@@ -41,11 +41,11 @@ Output:
 
 **Caveat:** SSE streaming does not work in combination with [GZipMiddleware](https://github.com/encode/starlette/issues/20#issuecomment-704106436).
 
-Be aware that for proper server shutdown the application must stop all
+Be aware that for proper server shutdown your application must stop all
 running tasks (generators). Otherwise you might experience the following warnings
 at shutdown: `Waiting for background tasks to complete. (CTRL+C to force quit)`.
 
-Client disconnects need to be handled in the Request handler (see example.py):
+Client disconnects need to be handled in your Request handler (see example.py):
 ```python
 async def endless(req: Request):
     async def event_publisher():
@@ -67,3 +67,9 @@ Run the tests:
 ```python
 make test
 ```
+
+## Changelog
+
+### 0.6.0 (first production grade release)
+- monkeypatch uvicorn signal-hanlder for seamless shutdown of long-running Request
+handler/generators (if uvicorn is installed)
