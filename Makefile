@@ -45,7 +45,8 @@ build: black isort
 	git push
 	python setup.py sdist
 
-upload: build
+.PHONY: upload
+upload:
 	@echo "upload"
 	twine upload --verbose dist/*
 
