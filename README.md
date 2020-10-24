@@ -74,6 +74,9 @@ make test
 
 ## Changelog
 
+### 0.6.1 (2020-10-24)
+- updated example with proper error handling
+
 ### 0.6.0 (2020-10-24)
 - In case [uvicorn](https://www.uvicorn.org/) is used: monkeypatch uvicorn signal-handler, 
   in order to gracefully shutdown long-running handlers/generators.
