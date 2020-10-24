@@ -38,7 +38,7 @@ clean:
 	rm -rf dist
 
 .PHONY: build
-build: black isort mypy
+build: black isort
 	@echo "building"
 	git add .
 	git commit

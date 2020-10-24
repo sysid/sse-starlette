@@ -15,6 +15,7 @@ pytest-cov = "*"
 starlette = "*"
 pytest-asyncio = "*"
 uvicorn = "*"
+fastapi = "*"
 
 [requires]
 python_version = "3.8"

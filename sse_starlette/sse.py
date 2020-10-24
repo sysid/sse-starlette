@@ -13,11 +13,37 @@ from starlette.concurrency import iterate_in_threadpool, run_until_first_complet
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
+
+# https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
+class AppStatus:
+    """ helper for monkeypatching the signal-handler of uvicorn """
+
+    should_exit = False
+
+    @staticmethod
+    def handle_exit(*args, **kwargs):
+        AppStatus.should_exit = True
+        original_handler(*args, **kwargs)
+
+
 try:
-    from uvicorn.config import logger as _log  # type: ignore
-except ModuleNotFoundError:
+    from uvicorn.config import logger as _log  # TODO: remove
+    from uvicorn.main import Server
+
+    original_handler = Server.handle_exit
+    Server.handle_exit = AppStatus.handle_exit
+
+    def unpatch_uvicorn_signal_handler():
+        """restores original signal-handler and rolls back monkey-patching.
+        Normally this should not be necessary.
+        """
+        Server.handle_exit = original_handler
+
+
+except ModuleNotFoundError as e:
     _log = logging.getLogger(__name__)
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
+    _log.debug(f"Uvicorn not used, falling back to python standard logging.")
 
 
 class SseState(enum.Enum):
@@ -91,14 +117,10 @@ class EventSourceResponse(Response):
 
     DEFAULT_PING_INTERVAL = 15
 
+    # noinspection PyMissingConstructor: follow Starlette StreamingResponse
     def __init__(
         self,
         content: Any,
-        # content: Iterator[Any],
-        # content: Union[
-        #     Generator[Union[str, Dict], None, None],
-        #     AsyncGenerator[Union[str, Dict], None],
-        # ],
         status_code: int = 200,
         headers: dict = None,
         media_type: str = "text/html",
@@ -106,6 +128,7 @@ class EventSourceResponse(Response):
         ping: int = None,
         sep: str = None,
     ) -> None:
+        # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
         if inspect.isasyncgen(content):
             self.body_iterator = content
@@ -169,6 +192,9 @@ class EventSourceResponse(Response):
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
+            if AppStatus.should_exit:
+                _log.debug(f"Caught signal. Stopping stream_response loop.")
+                break
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
             else:
