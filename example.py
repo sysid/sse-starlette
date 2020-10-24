@@ -6,6 +6,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
 from sse_starlette.sse import EventSourceResponse, unpatch_uvicorn_signal_handler
+
 # unpatch_uvicorn_signal_handler()  # if you want to rollback monkeypatching of uvcorn signal-handler
 
 from uvicorn.config import logger as _log

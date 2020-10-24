@@ -1,4 +1,4 @@
-# Server Sent Events for [Starlette](https://github.com/encode/starlette)
+# Server Sent Events for [Starlette](https://github.com/encode/starlette) and [FastAPI](https://fastapi.tiangolo.com/)
 
 Background: https://sysid.github.io/sse/
 
@@ -70,6 +70,6 @@ make test
 
 ## Changelog
 
-### 0.6.0 (first production grade release)
-- monkeypatch uvicorn signal-hanlder for seamless shutdown of long-running Request
-handler/generators (if uvicorn is installed)
+### 0.6.0 (2020-10-24)
+- In case [uvicorn](https://www.uvicorn.org/) is used: monkeypatch uvicorn signal-handler, 
+  in order to gracefully shutdown long-running handlers/generators.

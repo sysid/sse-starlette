@@ -17,6 +17,7 @@ from starlette.types import Receive, Scope, Send
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
     """ helper for monkeypatching the signal-handler of uvicorn """
+
     should_exit = False
 
     @staticmethod
@@ -32,16 +33,16 @@ try:
     original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit
 
-
     def unpatch_uvicorn_signal_handler():
-        """ restores original signal-handler and rolls back monkey-patching.
-            Normally this should not be necessary.
+        """restores original signal-handler and rolls back monkey-patching.
+        Normally this should not be necessary.
         """
         Server.handle_exit = original_handler
 
+
 except ModuleNotFoundError as e:
     _log = logging.getLogger(__name__)
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
     _log.debug(f"Uvicorn not used, falling back to python standard logging.")
 
 
@@ -53,13 +54,13 @@ class SseState(enum.Enum):
 
 class ServerSentEvent:
     def __init__(
-            self,
-            data: Any,
-            *,
-            event: Optional[str] = None,
-            id: Optional[int] = None,
-            retry: Optional[int] = None,
-            sep: str = None,
+        self,
+        data: Any,
+        *,
+        event: Optional[str] = None,
+        id: Optional[int] = None,
+        retry: Optional[int] = None,
+        sep: str = None,
     ) -> None:
         """Send data using EventSource protocol
 
@@ -116,21 +117,18 @@ class EventSourceResponse(Response):
 
     DEFAULT_PING_INTERVAL = 15
 
+    # noinspection PyMissingConstructor: follow Starlette StreamingResponse
     def __init__(
-            self,
-            content: Any,
-            # content: Iterator[Any],
-            # content: Union[
-            #     Generator[Union[str, Dict], None, None],
-            #     AsyncGenerator[Union[str, Dict], None],
-            # ],
-            status_code: int = 200,
-            headers: dict = None,
-            media_type: str = "text/html",
-            background: BackgroundTask = None,
-            ping: int = None,
-            sep: str = None,
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: dict = None,
+        media_type: str = "text/html",
+        background: BackgroundTask = None,
+        ping: int = None,
+        sep: str = None,
     ) -> None:
+        # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
         if inspect.isasyncgen(content):
             self.body_iterator = content
@@ -160,8 +158,6 @@ class EventSourceResponse(Response):
 
         self._loop = asyncio.get_event_loop()
         self._ping_task = None
-
-        _ = None
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:

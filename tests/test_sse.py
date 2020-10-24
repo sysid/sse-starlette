@@ -17,6 +17,15 @@ Integration test for lost client connection:
 
 expected outcome:
 all streaming stops, including pings (log output)
+
+
+Integration test for uvicorn shutdown (Ctrl-C) with long running task
+1. start example.py with log_level='trace'
+2. curl http://localhost:8000/endless
+3. CTRL-C: stop server
+
+expected outcome:
+server shut down gracefully, no pending tasks
 """
 
 
