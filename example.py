@@ -49,18 +49,21 @@ async def endless(req: Request):
 
     async def event_publisher():
         i = 0
-
-        while True:
-            disconnected = await req.is_disconnected()
-            if disconnected:
-                _log.info(f"Disconnecting client {req.client}")
-                break
-            # yield dict(id=..., event=..., data=...)
-            i += 1
-            yield dict(data=i)
-            await asyncio.sleep(0.9)
-        _log.info(f"Disconnected from client {req.client}")
-
+        try:
+            while True:
+                disconnected = await req.is_disconnected()
+                if disconnected:
+                    _log.info(f"Disconnecting client {req.client}")
+                    break
+                # yield dict(id=..., event=..., data=...)
+                i += 1
+                yield dict(data=i)
+                await asyncio.sleep(0.9)
+            _log.info(f"Disconnected from client {req.client}")
+        except asyncio.CancelledError as e:
+            _log.info(f"Disconnected from client (via refresh/close) {req.client}")
+            # Do any other cleanup, if any
+            raise e
     return EventSourceResponse(event_publisher())
 
 
