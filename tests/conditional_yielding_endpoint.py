@@ -13,7 +13,6 @@ from sse_starlette.sse import EventSourceResponse
 # no yielded messages would get into the old codepath that checks AppStatus
 
 
-
 app = FastAPI()
 
 items = {}
