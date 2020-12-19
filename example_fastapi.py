@@ -9,8 +9,6 @@ from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
 
-items = {}
-
 
 @app.get("/endless")
 async def endless(req: Request):
