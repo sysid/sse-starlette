@@ -74,6 +74,9 @@ make test
 
 ## Changelog
 
+### 0.6.2 (2020-12-19)
+- fix: correct shutdown signal handling in case of an endpoint which only yields sporadic messages
+
 ### 0.6.1 (2020-10-24)
 - updated example with proper error handling
 

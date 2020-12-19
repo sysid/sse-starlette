@@ -1,5 +1,10 @@
 import asyncio
 
+# example by: justindujardin
+#
+# tests proper shutdown in case no messages are yielded:
+# no yielded messages would get into the old codepath that checks AppStatus
+
 import uvicorn
 from fastapi import FastAPI
 from starlette.requests import Request
@@ -21,16 +26,18 @@ async def endless(req: Request):
     """
 
     async def event_publisher():
-        i = 0
+        # The event publisher only conditionally emits items
+        has_data = True
 
         while True:
             disconnected = await req.is_disconnected()
             if disconnected:
                 _log.info(f"Disconnecting client {req.client}")
                 break
-            # yield dict(id=..., event=..., data=...)
-            i += 1
-            yield dict(data=i)
+            # Simulate only sending one response
+            if has_data:
+                yield dict(data="u can haz the data")
+                has_data = False
             await asyncio.sleep(0.9)
         _log.info(f"Disconnected from client {req.client}")
 

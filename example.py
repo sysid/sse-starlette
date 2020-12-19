@@ -64,6 +64,7 @@ async def endless(req: Request):
             _log.info(f"Disconnected from client (via refresh/close) {req.client}")
             # Do any other cleanup, if any
             raise e
+
     return EventSourceResponse(event_publisher())
 
 
