@@ -167,12 +167,17 @@ class EventSourceResponse(Response):
                 _log.debug(f"Got event: http.disconnect. Stop streaming.")
                 break
 
+    @staticmethod
+    async def listen_for_exit_signal() -> None:
+        while not AppStatus.should_exit:
+            await asyncio.sleep(1.0)
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         await run_until_first_complete(
             (self.stream_response, {"send": send}),
             (self.listen_for_disconnect, {"receive": receive}),
+            (self.listen_for_exit_signal, {}),
         )
-
         self.stop_streaming()
         await self.wait()
         _log.debug(f"streaming stopped.")
@@ -192,9 +197,6 @@ class EventSourceResponse(Response):
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
-            if AppStatus.should_exit:
-                _log.debug(f"Caught signal. Stopping stream_response loop.")
-                break
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
             else:
