@@ -1,5 +1,9 @@
 # Server Sent Events for [Starlette](https://github.com/encode/starlette) and [FastAPI](https://fastapi.tiangolo.com/)
 
+[![PyPI Version][pypi-image]][pypi-url]
+[![Build Status][build-image]][build-url]
+[![Code Coverage][coverage-image]][coverage-url]
+
 Background: https://sysid.github.io/sse/
 
 Installation:
@@ -74,6 +78,9 @@ make test
 
 ## Changelog
 
+### 0.7.1 (2021-04-18)
+- refactoring: Github Actions introduced into build pipeline
+
 ### 0.6.2 (2020-12-19)
 - fix: correct shutdown signal handling in case of an endpoint which only yields sporadic messages
 
@@ -83,3 +90,13 @@ make test
 ### 0.6.0 (2020-10-24)
 - In case [uvicorn](https://www.uvicorn.org/) is used: monkeypatch uvicorn signal-handler, 
   in order to gracefully shutdown long-running handlers/generators.
+
+
+<!-- Badges -->
+
+[pypi-image]: https://img.shields.io/pypi/v/sse-starlette
+[pypi-url]: https://pypi.org/project/sse-starlette/
+[build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
+[build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
+[coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/main/graph/badge.svg
+[coverage-url]: https://codecov.io/gh/sysid/sse-starlette
