@@ -54,10 +54,11 @@ coverage:  ## Run tests with coverage
 .PHONY: build
 build: black isort  ## format and build
 	@echo "building"
-	git add .
-	git commit
-	git push
-	python setup.py sdist
+#	git add .
+#	git commit
+#	git push
+	#python setup.py sdist
+	python -m build
 
 .PHONY: upload
 upload:  ## upload to PyPi
