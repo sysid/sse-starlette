@@ -20,10 +20,7 @@ pipenv = pipenv
 
 .PHONY: all help clean build
 
-# Put it first so that "make" without argument is like "make help".
-#.PHONY: help
-#help:
-#	@echo "$(MAKE) [all,clean,build]"
+# Flow: commit, bump, git release, push/action, build, upload
 
 .PHONY: all
 all: clean build upload tag  ## Build and upload
