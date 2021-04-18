@@ -52,7 +52,7 @@ coverage:  ## Run tests with coverage
 	python -m coverage report -m
 
 .PHONY: build
-build: black isort  ## format and build
+build: clean black isort  ## format and build
 	@echo "building"
 #	git add .
 #	git commit
