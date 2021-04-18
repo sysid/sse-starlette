@@ -78,7 +78,7 @@ make test
 
 ## Changelog
 
-### 0.7.1 (2021-04-18)
+### 0.7.2 (2021-04-18)
 - refactoring: Github Actions introduced into build pipeline
 
 ### 0.6.2 (2020-12-19)
@@ -98,5 +98,5 @@ make test
 [pypi-url]: https://pypi.org/project/sse-starlette/
 [build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
 [build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
-[coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/main/graph/badge.svg
+[coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/master/graph/badge.svg
 [coverage-url]: https://codecov.io/gh/sysid/sse-starlette
