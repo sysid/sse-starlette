@@ -4,7 +4,7 @@
 SOURCEDIR     = source
 BUILDDIR      = build
 MAKE          = make
-VERSION       = $(shell cat sse_starlette/__init__.py | grep __version__ | sed "s/__version__ = //" | sed "s/'//g")
+VERSION       = $(shell cat VERSION)
 
 app_root = .
 pkg_src =  $(app_root)/sse_starlette
