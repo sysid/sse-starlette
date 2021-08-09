@@ -13,6 +13,7 @@ from starlette.concurrency import iterate_in_threadpool, run_until_first_complet
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
+_log = logging.getLogger(__name__)
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
@@ -27,7 +28,6 @@ class AppStatus:
 
 
 try:
-    from uvicorn.config import logger as _log  # TODO: remove
     from uvicorn.main import Server
 
     original_handler = Server.handle_exit
@@ -39,11 +39,8 @@ try:
         """
         Server.handle_exit = original_handler
 
-
 except ModuleNotFoundError as e:
-    _log = logging.getLogger(__name__)
-    # logging.basicConfig(level=logging.INFO)
-    _log.debug(f"Uvicorn not used, falling back to python standard logging.")
+    _log.debug(f"Uvicorn not used")
 
 
 class SseState(enum.Enum):
