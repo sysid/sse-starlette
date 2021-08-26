@@ -1,11 +1,16 @@
 import asyncio
+import logging
 
 import uvicorn
 from fastapi import FastAPI
 from starlette.requests import Request
-from uvicorn.config import logger as _log
 
 from sse_starlette.sse import EventSourceResponse
+
+_log = logging.getLogger(__name__)
+log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
 
 app = FastAPI()
 
@@ -36,4 +41,4 @@ async def endless(req: Request):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)

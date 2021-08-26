@@ -15,9 +15,10 @@ from starlette.types import Receive, Scope, Send
 
 _log = logging.getLogger(__name__)
 
+
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
-    """ helper for monkeypatching the signal-handler of uvicorn """
+    """helper for monkeypatching the signal-handler of uvicorn"""
 
     should_exit = False
 
@@ -39,8 +40,9 @@ try:
         """
         Server.handle_exit = original_handler
 
+
 except ModuleNotFoundError as e:
-    _log.debug(f"Uvicorn not used")
+    _log.debug(f"Uvicorn not used.")
 
 
 class SseState(enum.Enum):
