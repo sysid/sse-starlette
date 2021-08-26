@@ -78,6 +78,9 @@ make test
 
 ## Changelog
 
+### 0.8.0 (2021-08-26)
+- using module-based logger instead of uvicorn logger
+
 ### 0.7.2 (2021-04-18)
 - refactoring: Github Actions introduced into build pipeline
 
