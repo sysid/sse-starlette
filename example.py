@@ -1,3 +1,4 @@
+import logging
 import asyncio
 import uvicorn
 from starlette.applications import Starlette
@@ -9,7 +10,10 @@ from sse_starlette.sse import EventSourceResponse, unpatch_uvicorn_signal_handle
 
 # unpatch_uvicorn_signal_handler()  # if you want to rollback monkeypatching of uvcorn signal-handler
 
-from uvicorn.config import logger as _log
+_log = logging.getLogger(__name__)
+log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
 
 html_sse = """
     <html>
@@ -34,7 +38,7 @@ html_sse = """
 
 
 async def numbers(minimum, maximum):
-    """ Simulates and limited stream """
+    """Simulates and limited stream"""
     for i in range(minimum, maximum + 1):
         await asyncio.sleep(0.9)
         yield dict(data=i)
@@ -86,4 +90,4 @@ routes = [
 app = Starlette(debug=True, routes=routes)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)
