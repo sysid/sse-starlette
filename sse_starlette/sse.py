@@ -54,11 +54,12 @@ class SseState(enum.Enum):
 class ServerSentEvent:
     def __init__(
         self,
-        data: Any,
+        data: Optional[str] = None,
         *,
         event: Optional[str] = None,
         id: Optional[int] = None,
         retry: Optional[int] = None,
+        comment: Optional[str] = None,
         sep: str = None,
     ) -> None:
         """Send data using EventSource protocol
@@ -74,18 +75,27 @@ class ServerSentEvent:
             the event. [What code handles this?] This must be an integer,
             specifying the reconnection time in milliseconds. If a non-integer
             value is specified, the field is ignored.
+        :param str comment: A colon as the first character of a line is essence
+            a comment, and is ignored. Usually used as a ping message to keep connecting.
+            If set, this will be a comment message.
         """
         self.data = data
         self.event = event
         self.id = id
         self.retry = retry
-
+        self.comment = comment
         self.DEFAULT_SEPARATOR = "\r\n"
         self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
         self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
 
     def encode(self) -> bytes:
         buffer = io.StringIO()
+        if self.comment is not None:
+            for chunk in self.LINE_SEP_EXPR.split(str(self.comment)):
+                buffer.write(f": {chunk}")
+                buffer.write(self._sep)
+            return buffer.getvalue().encode("utf-8")
+
         if self.id is not None:
             buffer.write(self.LINE_SEP_EXPR.sub("", f"id: {self.id}"))
             buffer.write(self._sep)
