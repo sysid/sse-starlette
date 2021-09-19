@@ -6,7 +6,7 @@ import io
 import logging
 import re
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, AsyncIterable
 
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
@@ -29,7 +29,7 @@ class AppStatus:
 
 
 try:
-    from uvicorn.main import Server
+    from uvicorn.main import Server  # type: ignore
 
     original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit
@@ -54,7 +54,7 @@ class SseState(enum.Enum):
 class ServerSentEvent:
     def __init__(
         self,
-        data: Optional[str] = None,
+        data: Optional[Any] = None,
         *,
         event: Optional[str] = None,
         id: Optional[int] = None,
@@ -140,9 +140,9 @@ class EventSourceResponse(Response):
         # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
         if inspect.isasyncgen(content):
-            self.body_iterator = content
+            self.body_iterator = content  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
         else:
-            self.body_iterator = iterate_in_threadpool(content)
+            self.body_iterator = iterate_in_threadpool(content)  # type: ignore
         self.status_code = status_code
         self.media_type = self.media_type if media_type is None else media_type
         self.background = background
@@ -206,7 +206,9 @@ class EventSourceResponse(Response):
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
-            if isinstance(data, dict):
+            if isinstance(data, ServerSentEvent):
+                chunk = data.encode()
+            elif isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
             else:
                 chunk = ServerSentEvent(str(data), sep=self.sep).encode()
