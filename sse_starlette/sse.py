@@ -6,7 +6,7 @@ import io
 import logging
 import re
 from datetime import datetime
-from typing import Any, Optional, Union, AsyncIterable
+from typing import Any, Optional, Union, AsyncIterable, Callable
 
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
@@ -136,9 +136,11 @@ class EventSourceResponse(Response):
         background: BackgroundTask = None,
         ping: int = None,
         sep: str = None,
+        ping_message_factory: Callable[[], ServerSentEvent] = None
     ) -> None:
         # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
+        self.ping_message_factory = ping_message_factory
         if inspect.isasyncgen(content):
             self.body_iterator = content  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
         else:
@@ -265,6 +267,7 @@ class EventSourceResponse(Response):
         # (one starting with a ':' character)
         while self.active:
             await asyncio.sleep(self._ping_interval)
-            ping = ServerSentEvent(datetime.utcnow(), event="ping").encode()
+            ping = ServerSentEvent(datetime.utcnow(), event="ping").encode() if self.ping_message_factory is None else \
+                self.ping_message_factory().encode()
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
