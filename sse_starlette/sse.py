@@ -118,6 +118,17 @@ class ServerSentEvent:
         return buffer.getvalue().encode("utf-8")
 
 
+def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any]) -> bytes:
+    if isinstance(data, bytes):
+        return data
+    elif isinstance(data, ServerSentEvent):
+        return data.encode()
+    elif isinstance(data, dict):
+        return ServerSentEvent(**data).encode()
+    else:
+        return ServerSentEvent(str(data)).encode()
+
+
 class EventSourceResponse(Response):
     """Implements the ServerSentEvent Protocol: https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
@@ -208,12 +219,7 @@ class EventSourceResponse(Response):
         self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
-            if isinstance(data, ServerSentEvent):
-                chunk = data.encode()
-            elif isinstance(data, dict):
-                chunk = ServerSentEvent(**data).encode()
-            else:
-                chunk = ServerSentEvent(str(data), sep=self.sep).encode()
+            chunk = ensure_bytes(data)
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
         await send({"type": "http.response.body", "body": b"", "more_body": False})
@@ -268,6 +274,6 @@ class EventSourceResponse(Response):
         while self.active:
             await asyncio.sleep(self._ping_interval)
             ping = ServerSentEvent(datetime.utcnow(), event="ping").encode() if self.ping_message_factory is None else \
-                self.ping_message_factory().encode()
+                ensure_bytes(self.ping_message_factory())
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
