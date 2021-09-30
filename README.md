@@ -78,6 +78,9 @@ make test
 
 ## Changelog
 
+### 0.8.1 (2021-09-30)
+- minimum required python version relaxed to python 3.6
+
 ### 0.8.0 (2021-08-26)
 - using module-based logger instead of uvicorn logger
 
