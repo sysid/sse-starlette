@@ -147,13 +147,15 @@ class EventSourceResponse(Response):
         background: BackgroundTask = None,
         ping: int = None,
         sep: str = None,
-        ping_message_factory: Callable[[], ServerSentEvent] = None
+        ping_message_factory: Callable[[], ServerSentEvent] = None,
     ) -> None:
         # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
         self.ping_message_factory = ping_message_factory
         if inspect.isasyncgen(content):
-            self.body_iterator = content  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
+            self.body_iterator = (
+                content
+            )  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
         else:
             self.body_iterator = iterate_in_threadpool(content)  # type: ignore
         self.status_code = status_code
@@ -273,7 +275,10 @@ class EventSourceResponse(Response):
         # (one starting with a ':' character)
         while self.active:
             await asyncio.sleep(self._ping_interval)
-            ping = ServerSentEvent(datetime.utcnow(), event="ping").encode() if self.ping_message_factory is None else \
-                ensure_bytes(self.ping_message_factory())
+            ping = (
+                ServerSentEvent(datetime.utcnow(), event="ping").encode()
+                if self.ping_message_factory is None
+                else ensure_bytes(self.ping_message_factory())
+            )
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
