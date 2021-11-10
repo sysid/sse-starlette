@@ -151,13 +151,11 @@ class EventSourceResponse(Response):
 
         self.init_headers(_headers)
 
-        self._loop = None
         self.ping_interval = self.DEFAULT_PING_INTERVAL if ping is None else ping
-        self._ping_task = None
         self.active = True
 
-        self._loop = asyncio.get_event_loop()
         self._ping_task = None
+        self._loop = asyncio.get_event_loop()
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:
