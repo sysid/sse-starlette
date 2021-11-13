@@ -1,3 +1,3 @@
-from sse_starlette.sse import ServerSentEvent
+from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 
-__all__ = ["ServerSentEvent"]
+__all__ = ["ServerSentEvent", "EventSourceResponse"]
