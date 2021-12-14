@@ -2,10 +2,9 @@ import asyncio
 
 import uvicorn
 from fastapi import FastAPI
+from sse_starlette.sse import EventSourceResponse
 from starlette.requests import Request
 from uvicorn.config import logger as _log
-
-from sse_starlette.sse import EventSourceResponse
 
 # example by: justindujardin
 #

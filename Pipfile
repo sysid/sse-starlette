@@ -12,6 +12,13 @@ pytest = "*"
 pytest-cov = "*"
 pytest-asyncio = "*"
 #black = "*"
+flake8 = "*"
+flake8-assert-msg = "*"
+flake8-blind-except = "*"
+flake8-bugbear = "*"
+flake8-comprehensions = "*"
+flake8-eradicate = "*"
+flake8-pytest-style = "*"
 
 [packages]
 starlette = "*"
