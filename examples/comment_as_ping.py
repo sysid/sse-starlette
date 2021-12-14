@@ -23,7 +23,7 @@ async def handle():
 
 
 app.include_router(router)
-app.mount("/", StaticFiles(directory="./statics"))
+app.mount("/", StaticFiles(directory="./"))
 
 if __name__ == "__main__":
     import uvicorn

@@ -6,17 +6,18 @@ verify_ssl = true
 [dev-packages]
 mypy = "*"
 build = "*"
-
-[packages]
-#black = "*"
 codecov = "*"
 isort = "*"
 pytest = "*"
 pytest-cov = "*"
-starlette = "*"
 pytest-asyncio = "*"
+#black = "*"
+
+[packages]
+starlette = "*"
 uvicorn = "*"
 fastapi = "*"
+anyio = "*"
 
 [requires]
 python_version = "3"

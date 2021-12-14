@@ -6,10 +6,12 @@ import io
 import logging
 import re
 from datetime import datetime
-from typing import Any, Optional, Union, AsyncIterable, Callable
+from functools import partial
+from typing import Any, Optional, Union, AsyncIterable, Callable, Coroutine
 
+import anyio
 from starlette.background import BackgroundTask
-from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
+from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
@@ -194,19 +196,6 @@ class EventSourceResponse(Response):
         while not AppStatus.should_exit:
             await asyncio.sleep(1.0)
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await run_until_first_complete(
-            (self.stream_response, {"send": send}),
-            (self.listen_for_disconnect, {"receive": receive}),
-            (self.listen_for_exit_signal, {}),
-        )
-        self.stop_streaming()
-        await self.wait()
-        _log.debug(f"streaming stopped.")
-
-        if self.background is not None:  # pragma: no cover, tested in StreamResponse
-            await self.background()
-
     async def stream_response(self, send) -> None:
         await send(
             {
@@ -216,32 +205,47 @@ class EventSourceResponse(Response):
             }
         )
 
-        self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
+        # self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
             chunk = ensure_bytes(data)
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
+
         await send({"type": "http.response.body", "body": b"", "more_body": False})
 
-    async def wait(self) -> None:
-        """EventSourceResponse object is used for streaming data to the client,
-        this method returns future, so we can wait until connection will
-        be closed or other task explicitly call ``stop_streaming`` method.
-        """
-        if self._ping_task is None:
-            raise RuntimeError("Response is not started")
-        with contextlib.suppress(asyncio.CancelledError):
-            await self._ping_task
-            _log.debug(f"SSE ping stopped.")  # pragma: no cover
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with anyio.create_task_group() as task_group:
+            async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
+                await func()
+                task_group.cancel_scope.cancel()
 
-    def stop_streaming(self) -> None:
-        """Used in conjunction with ``wait`` could be called from other task
-        to notify client that server no longer wants to stream anything.
-        """
-        if self._ping_task is None:
-            raise RuntimeError("Response is not started")
-        self._ping_task.cancel()
+            task_group.start_soon(wrap, partial(self.stream_response, send))
+            task_group.start_soon(wrap, partial(self._ping, send))
+            task_group.start_soon(wrap, self.listen_for_exit_signal)
+            await wrap(partial(self.listen_for_disconnect, receive))
+
+        if self.background is not None:  # pragma: no cover, tested in StreamResponse
+            await self.background()
+
+    # async def wait(self) -> None:
+    #     """EventSourceResponse object is used for streaming data to the client,
+    #     this method returns future, so we can wait until connection will
+    #     be closed or other task explicitly call ``stop_streaming`` method.
+    #     """
+    #     if self._ping_task is None:
+    #         raise RuntimeError("Response is not started")
+    #     with contextlib.suppress(asyncio.CancelledError):
+    #         await self._ping_task
+    #         _log.debug(f"SSE ping stopped.")  # pragma: no cover
+
+    # def stop_streaming(self) -> None:
+    #     """Used in conjunction with ``wait`` could be called from other task
+    #     to notify client that server no longer wants to stream anything.
+    #     """
+    #     if self._ping_task is None:
+    #         raise RuntimeError("Response is not started")
+    #     self._ping_task.cancel()
 
     def enable_compression(self, force: bool = False) -> None:
         raise NotImplementedError

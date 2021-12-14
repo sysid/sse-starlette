@@ -50,7 +50,6 @@ def test_sync_event_source_response(input, expected):
                     yield dict(data=i, event="message")
 
         generator = numbers(1, 5)
-        # noinspection PyTypeChecker
         response = EventSourceResponse(generator, ping=0.2)  # type: ignore
         await response(scope, receive, send)
 
@@ -61,16 +60,16 @@ def test_sync_event_source_response(input, expected):
     print(response.content)
 
 
-@pytest.mark.asyncio
-async def test_wait_stop_streaming_errors():
-    response = EventSourceResponse(0)
-    with pytest.raises(RuntimeError) as ctx:
-        await response.wait()
-    assert str(ctx.value) == "Response is not started"
-
-    with pytest.raises(RuntimeError) as ctx:
-        response.stop_streaming()
-    assert str(ctx.value) == "Response is not started"
+# @pytest.mark.asyncio
+# async def test_wait_stop_streaming_errors():
+#     response = EventSourceResponse(0)
+#     with pytest.raises(RuntimeError) as ctx:
+#         await response.wait()
+#     assert str(ctx.value) == "Response is not started"
+#
+#     with pytest.raises(RuntimeError) as ctx:
+#         response.stop_streaming()
+#     assert str(ctx.value) == "Response is not started"
 
 
 def test_compression_not_implemented():
