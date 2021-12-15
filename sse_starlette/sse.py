@@ -1,15 +1,16 @@
 import asyncio
-import contextlib
 import enum
 import inspect
 import io
 import logging
 import re
 from datetime import datetime
-from typing import Any, Optional, Union, AsyncIterable, Callable
+from functools import partial
+from typing import Any, AsyncIterable, Callable, Coroutine, Dict, Optional, Union
 
+import anyio
 from starlette.background import BackgroundTask
-from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
+from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
@@ -41,8 +42,8 @@ try:
         Server.handle_exit = original_handler
 
 
-except ModuleNotFoundError as e:
-    _log.debug(f"Uvicorn not used.")
+except ModuleNotFoundError:
+    _log.debug("Uvicorn not used.")
 
 
 class SseState(enum.Enum):
@@ -60,7 +61,7 @@ class ServerSentEvent:
         id: Optional[int] = None,
         retry: Optional[int] = None,
         comment: Optional[str] = None,
-        sep: str = None,
+        sep: Optional[str] = None,
     ) -> None:
         """Send data using EventSource protocol
 
@@ -142,14 +143,13 @@ class EventSourceResponse(Response):
         self,
         content: Any,
         status_code: int = 200,
-        headers: dict = None,
+        headers: Optional[Dict] = None,
         media_type: str = "text/html",
-        background: BackgroundTask = None,
-        ping: int = None,
-        sep: str = None,
-        ping_message_factory: Callable[[], ServerSentEvent] = None,
+        background: Optional[BackgroundTask] = None,
+        ping: Optional[int] = None,
+        sep: Optional[str] = None,
+        ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
     ) -> None:
-        # super().__init__()  # follow Starlette StreamingResponse
         self.sep = sep
         self.ping_message_factory = ping_message_factory
         if inspect.isasyncgen(content):
@@ -162,7 +162,7 @@ class EventSourceResponse(Response):
         self.media_type = self.media_type if media_type is None else media_type
         self.background = background
 
-        _headers = dict()
+        _headers = {}
         if headers is not None:  # pragma: no cover
             _headers.update(headers)
 
@@ -171,7 +171,6 @@ class EventSourceResponse(Response):
         _headers["Cache-Control"] = "no-cache"
         _headers["Connection"] = "keep-alive"
         _headers["X-Accel-Buffering"] = "no"
-        # _headers['Transfer-Encoding'] = 'chunked'
 
         self.init_headers(_headers)
 
@@ -186,26 +185,13 @@ class EventSourceResponse(Response):
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
-                _log.debug(f"Got event: http.disconnect. Stop streaming.")
+                _log.debug("Got event: http.disconnect. Stop streaming.")
                 break
 
     @staticmethod
     async def listen_for_exit_signal() -> None:
         while not AppStatus.should_exit:
             await asyncio.sleep(1.0)
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await run_until_first_complete(
-            (self.stream_response, {"send": send}),
-            (self.listen_for_disconnect, {"receive": receive}),
-            (self.listen_for_exit_signal, {}),
-        )
-        self.stop_streaming()
-        await self.wait()
-        _log.debug(f"streaming stopped.")
-
-        if self.background is not None:  # pragma: no cover, tested in StreamResponse
-            await self.background()
 
     async def stream_response(self, send) -> None:
         await send(
@@ -216,32 +202,29 @@ class EventSourceResponse(Response):
             }
         )
 
-        self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
+        # self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
             chunk = ensure_bytes(data)
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
+
         await send({"type": "http.response.body", "body": b"", "more_body": False})
 
-    async def wait(self) -> None:
-        """EventSourceResponse object is used for streaming data to the client,
-        this method returns future, so we can wait until connection will
-        be closed or other task explicitly call ``stop_streaming`` method.
-        """
-        if self._ping_task is None:
-            raise RuntimeError("Response is not started")
-        with contextlib.suppress(asyncio.CancelledError):
-            await self._ping_task
-            _log.debug(f"SSE ping stopped.")  # pragma: no cover
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with anyio.create_task_group() as task_group:
 
-    def stop_streaming(self) -> None:
-        """Used in conjunction with ``wait`` could be called from other task
-        to notify client that server no longer wants to stream anything.
-        """
-        if self._ping_task is None:
-            raise RuntimeError("Response is not started")
-        self._ping_task.cancel()
+            async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
+                await func()
+                task_group.cancel_scope.cancel()
+
+            task_group.start_soon(wrap, partial(self.stream_response, send))
+            task_group.start_soon(wrap, partial(self._ping, send))
+            task_group.start_soon(wrap, self.listen_for_exit_signal)
+            await wrap(partial(self.listen_for_disconnect, receive))
+
+        if self.background is not None:  # pragma: no cover, tested in StreamResponse
+            await self.background()
 
     def enable_compression(self, force: bool = False) -> None:
         raise NotImplementedError

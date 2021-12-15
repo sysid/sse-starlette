@@ -2,10 +2,9 @@ import asyncio
 
 import uvicorn
 from fastapi import FastAPI
+from sse_starlette.sse import EventSourceResponse
 from starlette.requests import Request
 from uvicorn.config import logger as _log
-
-from sse_starlette.sse import EventSourceResponse
 
 # example by: justindujardin
 #
@@ -20,7 +19,7 @@ items = {}
 
 @app.get("/endless")
 async def endless(req: Request):
-    """Simulates and endless stream
+    """Simulates an endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
     to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
