@@ -144,7 +144,7 @@ class EventSourceResponse(Response):
         content: Any,
         status_code: int = 200,
         headers: Optional[Dict] = None,
-        media_type: str = "text/html",
+        media_type: str = "text/event-stream",
         background: Optional[BackgroundTask] = None,
         ping: Optional[int] = None,
         sep: Optional[str] = None,
@@ -167,7 +167,6 @@ class EventSourceResponse(Response):
             _headers.update(headers)
 
         # mandatory for servers-sent events headers
-        _headers["Content-Type"] = "text/event-stream"
         _headers["Cache-Control"] = "no-cache"
         _headers["Connection"] = "keep-alive"
         _headers["X-Accel-Buffering"] = "no"
