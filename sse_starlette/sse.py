@@ -131,14 +131,16 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any]) -> bytes:
 
 
 class EventSourceResponse(Response):
-    """Implements the ServerSentEvent Protocol: https://www.w3.org/TR/2009/WD-eventsource-20090421/
+    """ Implements the ServerSentEvent Protocol:
+    https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
-    Responses must not be compressed by middleware in order to work properly.
+    Responses must not be compressed by middleware in order to work.
     """
 
     DEFAULT_PING_INTERVAL = 15
 
-    # noinspection PyMissingConstructor: follow Starlette StreamingResponse
+    # follow Starlette StreamingResponse
+    # noinspection PyMissingConstructor
     def __init__(
         self,
         content: Any,
@@ -201,9 +203,6 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
-
-        # self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
-
         async for data in self.body_iterator:
             chunk = ensure_bytes(data)
             _log.debug(f"chunk: {chunk.decode()}")
@@ -216,6 +215,7 @@ class EventSourceResponse(Response):
 
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
                 await func()
+                # noinspection PyAsyncCall
                 task_group.cancel_scope.cancel()
 
             task_group.start_soon(wrap, partial(self.stream_response, send))

@@ -1,12 +1,13 @@
-import logging
 import asyncio
+import logging
+
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
-from sse_starlette.sse import EventSourceResponse, unpatch_uvicorn_signal_handler
+from sse_starlette.sse import EventSourceResponse
 
 # unpatch_uvicorn_signal_handler()  # if you want to rollback monkeypatching of uvcorn signal-handler
 
@@ -55,15 +56,10 @@ async def endless(req: Request):
         i = 0
         try:
             while True:
-                disconnected = await req.is_disconnected()
-                if disconnected:
-                    _log.info(f"Disconnecting client {req.client}")
-                    break
                 # yield dict(id=..., event=..., data=...)
                 i += 1
                 yield dict(data=i)
                 await asyncio.sleep(0.9)
-            _log.info(f"Disconnected from client {req.client}")
         except asyncio.CancelledError as e:
             _log.info(f"Disconnected from client (via refresh/close) {req.client}")
             # Do any other cleanup, if any
