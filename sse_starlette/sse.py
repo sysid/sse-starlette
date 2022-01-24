@@ -131,14 +131,16 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any]) -> bytes:
 
 
 class EventSourceResponse(Response):
-    """Implements the ServerSentEvent Protocol: https://www.w3.org/TR/2009/WD-eventsource-20090421/
+    """ Implements the ServerSentEvent Protocol:
+    https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
-    Responses must not be compressed by middleware in order to work properly.
+    Responses must not be compressed by middleware in order to work.
     """
 
     DEFAULT_PING_INTERVAL = 15
 
-    # noinspection PyMissingConstructor: follow Starlette StreamingResponse
+    # follow Starlette StreamingResponse
+    # noinspection PyMissingConstructor
     def __init__(
         self,
         content: Any,
@@ -201,9 +203,6 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
-
-        # self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
-
         async for data in self.body_iterator:
             chunk = ensure_bytes(data)
             _log.debug(f"chunk: {chunk.decode()}")
@@ -214,8 +213,10 @@ class EventSourceResponse(Response):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         async with anyio.create_task_group() as task_group:
 
+            # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
                 await func()
+                # noinspection PyAsyncCall
                 task_group.cancel_scope.cancel()
 
             task_group.start_soon(wrap, partial(self.stream_response, send))
@@ -256,6 +257,8 @@ class EventSourceResponse(Response):
         # (one starting with a ':' character)
         while self.active:
             await asyncio.sleep(self._ping_interval)
+            if self.ping_message_factory:
+                assert isinstance(self.ping_message_factory, Callable)
             ping = (
                 ServerSentEvent(datetime.utcnow(), event="ping").encode()
                 if self.ping_message_factory is None
