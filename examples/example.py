@@ -49,7 +49,7 @@ async def endless(req: Request):
     """Simulates and endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
-    to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
+    to enable proper server shutdown. Otherwise, there will be dangling tasks preventing proper shutdown.
     """
 
     async def event_publisher():
@@ -86,4 +86,4 @@ routes = [
 app = Starlette(debug=True, routes=routes)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)  # type: ignore

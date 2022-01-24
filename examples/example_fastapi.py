@@ -20,25 +20,25 @@ async def endless(req: Request):
     """Simulates and endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
-    to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
+    to enable proper server shutdown. Otherwise, there will be dangling tasks preventing proper shutdown.
     """
 
     async def event_publisher():
         i = 0
 
-        while True:
-            disconnected = await req.is_disconnected()
-            if disconnected:
-                _log.info(f"Disconnecting client {req.client}")
-                break
-            # yield dict(id=..., event=..., data=...)
-            i += 1
-            yield dict(data=i)
-            await asyncio.sleep(0.9)
-        _log.info(f"Disconnected from client {req.client}")
+        try:
+            while True:
+                # yield dict(id=..., event=..., data=...)
+                i += 1
+                yield dict(data=i)
+                await asyncio.sleep(0.9)
+        except asyncio.CancelledError as e:
+            _log.info(f"Disconnected from client (via refresh/close) {req.client}")
+            # Do any other cleanup, if any
+            raise e
 
     return EventSourceResponse(event_publisher())
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="trace", log_config=None)  # type: ignore
