@@ -1,74 +1,6 @@
-import asyncio
-import logging
-
 import pytest
+
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
-from starlette.testclient import TestClient
-
-logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
-
-"""
-Integration test for lost client connection:
-
-1. start example.py with log_level='trace'
-2. curl http://localhost:8000/endless
-3. kill curl
-
-expected outcome:
-all streaming stops, including pings (log output)
-
-
-Integration test for uvicorn shutdown (Ctrl-C) with long running task
-1. start example.py with log_level='trace'
-2. curl http://localhost:8000/endless
-3. CTRL-C: stop server
-
-expected outcome:
-server shut down gracefully, no pending tasks
-"""
-
-
-@pytest.mark.parametrize(
-    "input,expected",
-    [
-        ("integer", b"data: 1\r\n\r\n"),
-        ("dict1", b"data: 1\r\n\r\n"),
-        ("dict2", b"event: message\r\ndata: 1\r\n\r\n"),
-    ],
-)
-def test_sync_event_source_response(input, expected):
-    async def app(scope, receive, send):
-        async def numbers(minimum, maximum):
-            for i in range(minimum, maximum + 1):
-                await asyncio.sleep(0.1)
-                if input == "integer":
-                    yield i
-                elif input == "dict1":
-                    yield dict(data=i)
-                elif input == "dict2":
-                    yield dict(data=i, event="message")
-
-        generator = numbers(1, 5)
-        response = EventSourceResponse(generator, ping=0.2)  # type: ignore
-        await response(scope, receive, send)
-
-    client = TestClient(app)
-    response = client.get("/")
-    assert response.content.decode().count("ping") == 2
-    assert expected in response.content
-    print(response.content)
-
-
-# @pytest.mark.asyncio
-# async def test_wait_stop_streaming_errors():
-#     response = EventSourceResponse(0)
-#     with pytest.raises(RuntimeError) as ctx:
-#         await response.wait()
-#     assert str(ctx.value) == "Response is not started"
-#
-#     with pytest.raises(RuntimeError) as ctx:
-#         response.stop_streaming()
-#     assert str(ctx.value) == "Response is not started"
 
 
 def test_compression_not_implemented():
@@ -83,12 +15,12 @@ def test_compression_not_implemented():
         ("foo", b"data: foo\r\n\r\n"),
         (dict(data="foo", event="bar"), b"event: bar\r\ndata: foo\r\n\r\n"),
         (
-            dict(data="foo", event="bar", id="xyz"),
-            b"id: xyz\r\nevent: bar\r\ndata: foo\r\n\r\n",
+                dict(data="foo", event="bar", id="xyz"),
+                b"id: xyz\r\nevent: bar\r\ndata: foo\r\n\r\n",
         ),
         (
-            dict(data="foo", event="bar", id="xyz", retry=1),
-            b"id: xyz\r\nevent: bar\r\ndata: foo\r\nretry: 1\r\n\r\n",
+                dict(data="foo", event="bar", id="xyz", retry=1),
+                b"id: xyz\r\nevent: bar\r\ndata: foo\r\nretry: 1\r\n\r\n",
         ),
     ],
 )
@@ -114,25 +46,25 @@ def test_server_sent_event(input, expected):
         ("\r\n", "\r\n"),
     ],
     ids=(
-        "stream-LF:line-LF",
-        "stream-LF:line-CR",
-        "stream-LF:line-CR+LF",
-        "stream-CR:line-LF",
-        "stream-CR:line-CR",
-        "stream-CR:line-CR+LF",
-        "stream-CR+LF:line-LF",
-        "stream-CR+LF:line-CR",
-        "stream-CR+LF:line-CR+LF",
+            "stream-LF:line-LF",
+            "stream-LF:line-CR",
+            "stream-LF:line-CR+LF",
+            "stream-CR:line-LF",
+            "stream-CR:line-CR",
+            "stream-CR:line-CR+LF",
+            "stream-CR+LF:line-LF",
+            "stream-CR+LF:line-CR",
+            "stream-CR+LF:line-CR+LF",
     ),
 )
 def test_multiline_data(stream_sep, line_sep):
     lines = line_sep.join(["foo", "bar", "xyz"])
     result = ServerSentEvent(lines, event="event", sep=stream_sep).encode()
     assert (
-        result
-        == "event: event{0}data: foo{0}data: bar{0}data: xyz{0}{0}".format(
-            stream_sep
-        ).encode()
+            result
+            == "event: event{0}data: foo{0}data: bar{0}data: xyz{0}{0}".format(
+        stream_sep
+    ).encode()
     )
 
 
@@ -162,5 +94,5 @@ def test_retry_is_int():
     assert response.retry == 1
 
     with pytest.raises(TypeError) as ctx:
-        response = ServerSentEvent(0, retry="ten").encode()
+        _ = ServerSentEvent(0, retry="ten").encode()  # type: ignore
     assert str(ctx.value) == "retry argument must be int"

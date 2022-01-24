@@ -35,15 +35,11 @@ async def app():
     async def home(request):
         return PlainTextResponse("Hello, world!")
 
-    async def home2(request):
-        return PlainTextResponse("Hello, world2!")
-
     async def endless(req: Request):
-        print("----------")
         async def event_publisher():
             i = 0
             try:
-                while i <= 20:
+                while True:  # i <= 20:
                     # yield dict(id=..., event=..., data=...)
                     i += 1
                     yield dict(data=i)
@@ -56,7 +52,7 @@ async def app():
         return EventSourceResponse(event_publisher())
 
     app = Starlette(
-        routes=[Route("/", home), Route("/endless", endpoint=endless), Route("/home2", home2)],
+        routes=[Route("/", home), Route("/endless", endpoint=endless)],
         on_startup=[startup],
         on_shutdown=[shutdown]
     )
