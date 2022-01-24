@@ -1,27 +1,25 @@
 import asyncio
+import logging
 
 import httpx
 import pytest
-import logging
-
 from asgi_lifespan import LifespanManager
+from sse_starlette import EventSourceResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
-from sse_starlette import EventSourceResponse
-
 _log = logging.getLogger(__name__)
-log_fmt = r'%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s'
-datefmt = '%Y-%m-%d %H:%M:%S'
+log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S"
 logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
 
 
 @pytest.fixture
 def anyio_backend():
-    """ Exclude trio from tests """
-    return 'asyncio'
+    """Exclude trio from tests"""
+    return "asyncio"
 
 
 @pytest.fixture
@@ -54,7 +52,7 @@ async def app():
     app = Starlette(
         routes=[Route("/", home), Route("/endless", endpoint=endless)],
         on_startup=[startup],
-        on_shutdown=[shutdown]
+        on_shutdown=[shutdown],
     )
 
     async with LifespanManager(app):

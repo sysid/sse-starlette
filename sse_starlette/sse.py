@@ -131,7 +131,7 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any]) -> bytes:
 
 
 class EventSourceResponse(Response):
-    """ Implements the ServerSentEvent Protocol:
+    """Implements the ServerSentEvent Protocol:
     https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
     Responses must not be compressed by middleware in order to work.
