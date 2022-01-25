@@ -4,8 +4,9 @@ import logging
 import anyio
 import pytest
 from httpx import AsyncClient
-from sse_starlette import EventSourceResponse
 from starlette.testclient import TestClient
+
+from sse_starlette import EventSourceResponse
 
 _log = logging.getLogger(__name__)
 
@@ -101,3 +102,15 @@ async def test_endless_full(client, caplog):
                 # The cancel_called property will be True if timeout was reached
                 assert scope.cancel_called is True
                 assert "chunk: data: 3" in caplog.text
+
+
+def test_header_charset():
+    async def numbers(minimum, maximum):
+        for i in range(minimum, maximum + 1):
+            await asyncio.sleep(0.1)
+            yield i
+
+    generator = numbers(1, 5)
+    response = EventSourceResponse(generator, ping=0.2)  # type: ignore
+    content_type = [h for h in response.raw_headers if h[0].decode() == "content-type"]
+    assert content_type == [(b"content-type", b"text/event-stream; charset=utf-8")]

@@ -77,6 +77,10 @@ make test
 ```
 
 ## Changelog
+### 0.10.3 (2022-01-25)
+- fix: use starlette's code to set proper content-type and charset
+- fix: update examples
+
 ### 0.10.0 (2021-12-14)
 - base EventSourceResponse on latest starlette StreamingResponse (0.17.1) and use anyio
 - breaking change: `response.wait()` and `response.stop_streaming()` removed
