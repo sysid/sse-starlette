@@ -4,9 +4,8 @@ import logging
 import anyio
 import pytest
 from httpx import AsyncClient
-from starlette.testclient import TestClient
-
 from sse_starlette import EventSourceResponse
+from starlette.testclient import TestClient
 
 _log = logging.getLogger(__name__)
 
