@@ -56,14 +56,9 @@ async def endless(req: Request):
         i = 0
         try:
           while True:
-              disconnected = await req.is_disconnected()
-              if disconnected:
-                  _log.info(f"Disconnecting client {req.client}")
-                  break
               i += 1
               yield dict(data=i)
               await asyncio.sleep(0.2)
-          _log.info(f"Disconnected from client {req.client}")
         except asyncio.CancelledError as e:
           _log.info(f"Disconnected from client (via refresh/close) {req.client}")
           # Do any other cleanup, if any
