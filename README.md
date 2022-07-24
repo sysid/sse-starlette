@@ -72,7 +72,7 @@ make test
 ```
 
 ## Changelog
-### 1.0.0
+### 1.0.0 (2022-07-24)
 - drop support for python 3.6 and 3.7
 - removed unused private attribute `_loop` from class `EventSourceResponse`
 - updated example in README.md
