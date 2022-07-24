@@ -178,7 +178,6 @@ class EventSourceResponse(Response):
         self.active = True
 
         self._ping_task = None
-        self._loop = asyncio.get_event_loop()
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:
