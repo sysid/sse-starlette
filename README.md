@@ -72,6 +72,11 @@ make test
 ```
 
 ## Changelog
+### 1.0.0
+- drop support for python 3.6 and 3.7
+- removed unused private attribute `_loop` from class `EventSourceResponse`
+- updated example in README.md
+
 ### 0.10.3 (2022-01-25)
 - fix: use starlette's code to set proper content-type and charset
 - fix: update examples
