@@ -19,7 +19,7 @@ _log = logging.getLogger(__name__)
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
-    """helper for monkeypatching the signal-handler of uvicorn"""
+    """helper for monkey-patching the signal-handler of uvicorn"""
 
     should_exit = False
 
@@ -40,7 +40,6 @@ try:
         Normally this should not be necessary.
         """
         Server.handle_exit = original_handler
-
 
 except ModuleNotFoundError:
     _log.debug("Uvicorn not used.")
@@ -162,7 +161,7 @@ class EventSourceResponse(Response):
             self.body_iterator = iterate_in_threadpool(content)  # type: ignore
         self.status_code = status_code
         self.media_type = self.media_type if media_type is None else media_type
-        self.background = background
+        self.background = background  # type: ignore  # follows https://github.com/encode/starlette/blob/master/starlette/responses.py
 
         _headers = {}
         if headers is not None:  # pragma: no cover
@@ -257,7 +256,7 @@ class EventSourceResponse(Response):
         while self.active:
             await asyncio.sleep(self._ping_interval)
             if self.ping_message_factory:
-                assert isinstance(self.ping_message_factory, Callable)
+                assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
                 ServerSentEvent(datetime.utcnow(), event="ping").encode()
                 if self.ping_message_factory is None

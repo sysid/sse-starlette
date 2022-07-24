@@ -1,8 +1,7 @@
 import asyncio
 
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
-
 from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI(title=__name__)
