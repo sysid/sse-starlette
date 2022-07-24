@@ -6,21 +6,75 @@ BUILDDIR      = build
 MAKE          = make
 VERSION       = $(shell cat VERSION)
 
-app_root = .
+app_root = $(PROJ_DIR)
+app_root ?= .
 pkg_src =  $(app_root)/sse_starlette
 tests_src = $(app_root)/tests
 
 # pipx installed globals
-isort = isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as --line-width 88 $(pkg_src) $(tests_src)
-black = black $(pkg_src) $(tests_src)
-mypy = mypy $(pkg_src)
-tox = tox
-pipenv = pipenv
+#isort = isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as --line-width 88 $(pkg_src) $(tests_src)
+#black = black $(pkg_src) $(tests_src)
+#mypy = mypy $(pkg_src)
+#tox = tox
+#pipenv = pipenv
 #mypy = mypy --config-file $(app_root)/mypy.ini $(pkg_src)
 
-.PHONY: all help clean build
+define PRINT_HELP_PYSCRIPT
+import re, sys
 
-# Flow: commit, bump, git release, push/action, build, upload
+for line in sys.stdin:
+	match = re.match(r'^([a-zA-Z0-9_-]+):.*?## (.*)$$', line)
+	if match:
+		target, help = match.groups()
+		print("\033[36m%-20s\033[0m %s" % (target, help))
+endef
+export PRINT_HELP_PYSCRIPT
+
+.PHONY: help
+help:
+	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+
+.PHONY: clean
+clean: clean-build clean-pyc  ## remove all build, test, coverage and Python artifacts
+
+.PHONY: clean-build
+clean-build: ## remove build artifacts
+	rm -fr build/
+	rm -fr dist/
+	rm -fr .eggs/
+	find . \( -path ./env -o -path ./venv -o -path ./.env -o -path ./.venv \) -prune -o -name '*.egg-info' -exec rm -fr {} +
+	find . \( -path ./env -o -path ./venv -o -path ./.env -o -path ./.venv \) -prune -o -name '*.egg' -exec rm -f {} +
+
+.PHONY: clean-pyc
+clean-pyc: ## remove Python file artifacts
+	find . -name '*.pyc' -exec rm -f {} +
+	find . -name '*.pyo' -exec rm -f {} +
+	find . -name '*~' -exec rm -f {} +
+	find . -name '__pycache__' -exec rm -fr {} +
+
+.PHONY: format
+format:  ## perform black formatting
+	black $(pkg_src) tests
+
+.PHONY: isort
+isort:  ## apply import sort ordering
+	isort . --profile black
+
+.PHONY: style
+style: isort format  ## perform code style format (black, isort)
+
+.PHONY: flake8
+flake8:  ## check style with flake8
+	@flake8 $(pkg_src)
+
+.PHONY: mypy
+mypy:  ## check type hint annotations
+	# keep config in setup.cfg for integration with PyCharm
+	mypy --config-file setup.cfg $(pkg_src)
+
+.PHONY: tox
+tox:   ## Run tox
+	$(tox)
 
 .PHONY: all
 all: clean build upload tag  ## Build and upload
@@ -28,33 +82,22 @@ all: clean build upload tag  ## Build and upload
 	@echo "-M- building and distributing"
 	@echo "--------------------------------------------------------------------------------"
 
-test:  ## run tests
-#	./scripts/test
-	python -m pytest -ra
-
-.PHONY: clean
-clean:  ## clean
-	@echo "Cleaning up..."
-	#git clean -Xdf
-	rm -rf dist
-
-.PHONY: tox
-tox:   ## Run tox
-	$(tox)
-
 .PHONY: coverage
 coverage:  ## Run tests with coverage
 	python -m coverage erase
 	python -m coverage run --include=$(pkg_src)/* -m pytest -ra
 	python -m coverage report -m
 
+.PHONY: lint
+lint: flake8 mypy ## lint code with all static code checks
+
+test:  ## run tests
+#	./scripts/test
+	python -m pytest -ra
+
 .PHONY: build
-build: clean black isort  ## format and build
+build: clean format isort  ## format and build
 	@echo "building"
-#	git add .
-#	git commit
-#	git push
-	#python setup.py sdist
 	python -m build
 
 .PHONY: upload
@@ -68,17 +111,9 @@ tag:  ## tag
 	git tag -a $(VERSION) -m "version $(VERSION)"
 	git push --tags
 
-.PHONY: mypy
-mypy:  ## type checking
-	$(mypy)
-
-.PHONY: black
-black:  ## formatting with black
-	$(black)
-
-.PHONY: isort
-isort:  ## sort imports
-	$(isort)
+.PHONY: bump-major
+bump-major:  ## bump-major
+	bumpversion --commit --verbose major
 
 .PHONY: bump-minor
 bump-minor:  ## bump-minor
@@ -88,21 +123,3 @@ bump-minor:  ## bump-minor
 bump-patch:  ## bump-patch
 	#bumpversion --dry-run --allow-dirty --verbose patch
 	bumpversion --verbose patch
-
-.PHONY: help
-help: ## Show help message
-	@IFS=$$'\n' ; \
-	help_lines=(`fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/:/'`); \
-	printf "%s\n\n" "Usage: make [task]"; \
-	printf "%-20s %s\n" "task" "help" ; \
-	printf "%-20s %s\n" "------" "----" ; \
-	for help_line in $${help_lines[@]}; do \
-		IFS=$$':' ; \
-		help_split=($$help_line) ; \
-		help_command=`echo $${help_split[0]} | sed -e 's/^ *//' -e 's/ *$$//'` ; \
-		help_info=`echo $${help_split[2]} | sed -e 's/^ *//' -e 's/ *$$//'` ; \
-		printf '\033[36m'; \
-		printf "%-20s %s" $$help_command ; \
-		printf '\033[0m'; \
-		printf "%s\n" $$help_info; \
-	done
