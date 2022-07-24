@@ -74,7 +74,7 @@ mypy:  ## check type hint annotations
 
 .PHONY: tox
 tox:   ## Run tox
-	$(tox)
+	tox
 
 .PHONY: all
 all: clean build upload tag  ## Build and upload
