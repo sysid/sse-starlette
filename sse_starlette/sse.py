@@ -168,7 +168,9 @@ class EventSourceResponse(Response):
             _headers.update(headers)
 
         # mandatory for servers-sent events headers
-        _headers["Cache-Control"] = "no-cache"
+        # allow cache control header to be set by user to support fan out proxies
+        # https://www.fastly.com/blog/server-sent-events-fastly
+        _headers.setdefault("Cache-Control", "no-cache")
         _headers["Connection"] = "keep-alive"
         _headers["X-Accel-Buffering"] = "no"
 
