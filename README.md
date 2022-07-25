@@ -40,7 +40,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level='info')
 ```
 
-Output:  
+Output:
 ![output](output.png)
 
 **Caveat:** SSE streaming does not work in combination with [GZipMiddleware](https://github.com/encode/starlette/issues/20#issuecomment-704106436).
@@ -82,6 +82,10 @@ return EventSourceResponse(
 ```
 
 ## Changelog
+### 1.1.0 (2022-07-25)
+- allow user to set cache-control header for fan-out use-case:
+  Ref: https://www.fastly.com/blog/server-sent-events-fastly
+
 ### 1.0.0 (2022-07-24)
 - drop support for python 3.6 and 3.7
 - removed unused private attribute `_loop` from class `EventSourceResponse`
@@ -114,7 +118,7 @@ return EventSourceResponse(
 - updated example with proper error handling
 
 ### 0.6.0 (2020-10-24)
-- In case [uvicorn](https://www.uvicorn.org/) is used: monkeypatch uvicorn signal-handler, 
+- In case [uvicorn](https://www.uvicorn.org/) is used: monkeypatch uvicorn signal-handler,
   in order to gracefully shutdown long-running handlers/generators.
 
 
