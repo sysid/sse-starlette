@@ -1,11 +1,12 @@
+---
 # https://github.com/nalgeon/podsearch-py/tree/main/.github/workflows
 name: build
 
 on:
   push:
-    branches: [ main ]
+    branches: [master]
   pull_request:
-    branches: [ main ]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -13,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.6, 3.7, 3.8, 3.9 ]
+        python-version: [3.6, 3.7, 3.8, 3.9, '3.10']
 
     env:
-      USING_COVERAGE: "3.9"
+      USING_COVERAGE: '3.10'
 
     steps:
       - name: Checkout sources

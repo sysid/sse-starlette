@@ -93,7 +93,8 @@ lint: flake8 mypy ## lint code with all static code checks
 
 test:  ## run tests
 #	./scripts/test
-	python -m pytest -ra
+	#python -m pytest -ra
+	python -m pytest -ra --junitxml=report.xml --cov-config=setup.cfg --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
 
 .PHONY: build
 build: clean format isort  ## format and build

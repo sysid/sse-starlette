@@ -124,7 +124,7 @@ return EventSourceResponse(
 
 <!-- Badges -->
 
-[pypi-image]: https://img.shields.io/pypi/v/sse-starlette
+[pypi-image]: https://badge.fury.io/py/sse-starlette.svg
 [pypi-url]: https://pypi.org/project/sse-starlette/
 [build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
 [build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
