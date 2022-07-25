@@ -73,7 +73,13 @@ make test
 
 ## Special use cases
 ### Fan out Proxies
-Fan out proxies usually rely on response being cacheable to support that you can provide the `Content-Type` header to  `EventSourceResponse`
+Fan out proxies usually rely on response being cacheable. To support that, you can set the value of `Cache-Control`.
+For example:
+```python
+return EventSourceResponse(
+        generator(), headers={"Cache-Control": "public, max-age=29"}
+    )
+```
 
 ## Changelog
 ### 1.0.0 (2022-07-24)
