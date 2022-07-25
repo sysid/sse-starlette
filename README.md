@@ -71,6 +71,10 @@ Run the tests:
 make test
 ```
 
+## Special use cases
+### Fan out Proxies
+Fan out proxies usually rely on response being cacheable to support that you can provide the `Content-Type` header to  `EventSourceResponse`
+
 ## Changelog
 ### 1.0.0 (2022-07-24)
 - drop support for python 3.6 and 3.7
