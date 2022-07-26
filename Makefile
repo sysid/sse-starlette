@@ -11,14 +11,6 @@ app_root ?= .
 pkg_src =  $(app_root)/sse_starlette
 tests_src = $(app_root)/tests
 
-# pipx installed globals
-#isort = isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as --line-width 88 $(pkg_src) $(tests_src)
-#black = black $(pkg_src) $(tests_src)
-#mypy = mypy $(pkg_src)
-#tox = tox
-#pipenv = pipenv
-#mypy = mypy --config-file $(app_root)/mypy.ini $(pkg_src)
-
 define PRINT_HELP_PYSCRIPT
 import re, sys
 
@@ -33,6 +25,38 @@ export PRINT_HELP_PYSCRIPT
 .PHONY: help
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+
+.PHONY: all
+all: clean build upload tag  ## Build and upload
+	@echo "--------------------------------------------------------------------------------"
+	@echo "-M- building and distributing"
+	@echo "--------------------------------------------------------------------------------"
+
+.PHONY: coverage
+coverage:  ## Run tests with coverage
+	python -m coverage erase
+	python -m coverage run --include=$(pkg_src)/* -m pytest -ra
+	python -m coverage report -m
+
+.PHONY: test
+test:  ## run tests
+	python -m pytest -ra --junitxml=report.xml --cov-config=setup.cfg --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
+
+.PHONY: build
+build: clean format isort  ## format and build
+	@echo "building"
+	python -m build
+
+.PHONY: upload
+upload:  ## upload to PyPi
+	@echo "upload"
+	twine upload --verbose dist/*
+
+.PHONY: tag
+tag:  ## tag with VERSION
+	@echo "tagging $(VERSION)"
+	git tag -a $(VERSION) -m "version $(VERSION)"
+	git push --tags
 
 .PHONY: clean
 clean: clean-build clean-pyc  ## remove all build, test, coverage and Python artifacts
@@ -52,6 +76,9 @@ clean-pyc: ## remove Python file artifacts
 	find . -name '*~' -exec rm -f {} +
 	find . -name '__pycache__' -exec rm -fr {} +
 
+.PHONY: style
+style: isort format  ## perform code style format (black, isort)
+
 .PHONY: format
 format:  ## perform black formatting
 	black $(pkg_src) tests
@@ -60,8 +87,8 @@ format:  ## perform black formatting
 isort:  ## apply import sort ordering
 	isort . --profile black
 
-.PHONY: style
-style: isort format  ## perform code style format (black, isort)
+.PHONY: lint
+lint: flake8 mypy ## lint code with all static code checks
 
 .PHONY: flake8
 flake8:  ## check style with flake8
@@ -75,42 +102,6 @@ mypy:  ## check type hint annotations
 .PHONY: tox
 tox:   ## Run tox
 	tox
-
-.PHONY: all
-all: clean build upload tag  ## Build and upload
-	@echo "--------------------------------------------------------------------------------"
-	@echo "-M- building and distributing"
-	@echo "--------------------------------------------------------------------------------"
-
-.PHONY: coverage
-coverage:  ## Run tests with coverage
-	python -m coverage erase
-	python -m coverage run --include=$(pkg_src)/* -m pytest -ra
-	python -m coverage report -m
-
-.PHONY: lint
-lint: flake8 mypy ## lint code with all static code checks
-
-test:  ## run tests
-#	./scripts/test
-	#python -m pytest -ra
-	python -m pytest -ra --junitxml=report.xml --cov-config=setup.cfg --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
-
-.PHONY: build
-build: clean format isort  ## format and build
-	@echo "building"
-	python -m build
-
-.PHONY: upload
-upload:  ## upload to PyPi
-	@echo "upload"
-	twine upload --verbose dist/*
-
-.PHONY: tag
-tag:  ## tag
-	@echo "tagging $(VERSION)"
-	git tag -a $(VERSION) -m "version $(VERSION)"
-	git push --tags
 
 .PHONY: bump-major
 bump-major:  ## bump-major
