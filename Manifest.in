@@ -1,1 +1,3 @@
-include ./sse_starlette/py.typed
+global-include *.typed
+prune .tox
+prune .venv
