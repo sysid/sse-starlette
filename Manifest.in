@@ -1,1 +1,1 @@
-include py.typed
+include ./sse_starlette/py.typed
