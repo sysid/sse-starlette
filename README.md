@@ -82,6 +82,9 @@ return EventSourceResponse(
 ```
 
 ## Changelog
+### 1.1.3 (2022-07-26)
+- fix: py.typed was missing in PyPi distribution
+
 ### 1.1.0 (2022-07-25)
 - allow user to set cache-control header for fan-out use-case:
   Ref: https://www.fastly.com/blog/server-sent-events-fastly
