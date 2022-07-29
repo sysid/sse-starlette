@@ -1,4 +1,3 @@
-import asyncio
 import enum
 import inspect
 import io
@@ -192,7 +191,7 @@ class EventSourceResponse(Response):
     @staticmethod
     async def listen_for_exit_signal() -> None:
         while not AppStatus.should_exit:
-            await asyncio.sleep(1.0)
+            await anyio.sleep(1.0)
 
     async def stream_response(self, send) -> None:
         await send(
@@ -255,7 +254,7 @@ class EventSourceResponse(Response):
         # Alternatively one can send periodically a comment line
         # (one starting with a ':' character)
         while self.active:
-            await asyncio.sleep(self._ping_interval)
+            await anyio.sleep(self._ping_interval)
             if self.ping_message_factory:
                 assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
