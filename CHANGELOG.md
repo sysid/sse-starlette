@@ -1,3 +1,10 @@
+
+<a id='changelog-1.1.6'></a>
+# 1.1.6 — 2022-07-31
+
+## Fixed
+
+- replace `asyncio.sleep()` with `anyio.sleep`
 <a id='changelog-1.1.4'></a>
 # 1.1.4 — 2022-07-31
 
