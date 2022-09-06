@@ -82,7 +82,7 @@ return EventSourceResponse(
 ```
 
 ## Changelog
-[CHANGELOG.md](CHANGELOG.md)
+[CHANGELOG.md](https://github.com/sysid/sse-starlette/blob/master/CHANGELOG.md)
 
 <!-- Badges -->
 
