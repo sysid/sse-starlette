@@ -11,3 +11,4 @@ tags
 __pycache__/
 venv/
 Pipfile.lock
+.envrc
