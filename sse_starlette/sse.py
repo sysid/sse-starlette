@@ -1,5 +1,4 @@
 import enum
-import inspect
 import io
 import logging
 import re
@@ -152,7 +151,7 @@ class EventSourceResponse(Response):
     ) -> None:
         self.sep = sep
         self.ping_message_factory = ping_message_factory
-        if inspect.isasyncgen(content):
+        if isinstance(content, AsyncIterable):
             self.body_iterator = (
                 content
             )  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
