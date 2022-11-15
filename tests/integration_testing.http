@@ -2,3 +2,15 @@ GET http://localhost:8000/endless
 Accept: application/json
 
 ###
+
+# curl -X 'POST'
+#  'http://127.0.0.1:8000/message?message=xxx'
+#  -H 'accept: application/json'
+#  -d ''
+POST http://127.0.0.1:8000/message?message=xxx
+accept: application/json
+Content-Type: application/x-www-form-urlencoded
+
+###
+
+
