@@ -12,7 +12,7 @@ pkg_src =  $(app_root)/sse_starlette
 tests_src = $(app_root)/tests
 
 .PHONY: all
-all: clean build upload tag  ## Build and upload
+all: clean build upload  ## Build and upload
 	@echo "--------------------------------------------------------------------------------"
 	@echo "-M- building and distributing"
 	@echo "--------------------------------------------------------------------------------"

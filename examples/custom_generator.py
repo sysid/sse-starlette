@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette import status
 
