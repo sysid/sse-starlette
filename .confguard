@@ -1,0 +1,14 @@
+#  vim: set ts=4 sw=4 tw=120 et ft=toml:
+[config]
+targets = ['.envrc', '.run']
+relative = true
+
+[_internal_] # DO NOT EDIT FROM HERE
+sentinel = "sse-starlette-e945c0ee"
+timestamp = 2022-12-27T16:00:56.486510
+files = """gASVMgEAAAAAAACMDXRvbWxraXQuaXRlbXOUjAVBcnJheZSTlF2UKGgAjAZTdHJpbmeUk5QojAhidWls
+dGluc5SMB2dldGF0dHKUk5RoAIwKU3RyaW5nVHlwZZSTlIwDU0xMlIaUUpSMBi5lbnZyY5SMBi5lbnZy
+Y5RoAIwGVHJpdmlhlJOUKYGUfZQojAZpbmRlbnSUjACUjApjb21tZW50X3dzlGgVjAdjb21tZW50lGgV
+jAV0cmFpbJSMAQqUdWJ0lFKUaACMCldoaXRlc3BhY2WUk5SMASyUiYaUUpRoHYwBIJSJhpRSlGgFKGgN
+jAQucnVulIwELnJ1bpRoESmBlH2UKGgUaBVoFmgVaBdoFWgYaBl1YnSUUpRlaBEpgZR9lChoFGgVaBZo
+FWgXaBVoGGgZdWKJh5RSlC4="""

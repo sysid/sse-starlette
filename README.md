@@ -4,7 +4,7 @@
 [![Build Status][build-image]][build-url]
 [![Code Coverage][coverage-image]][coverage-url]
 
-Background: https://sysid.github.io/sse/
+Background: https://sysid.github.io/server-sent-events/
 
 Installation:
 
