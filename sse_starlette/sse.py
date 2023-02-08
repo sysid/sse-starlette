@@ -20,10 +20,15 @@ class AppStatus:
     """helper for monkey-patching the signal-handler of uvicorn"""
 
     should_exit = False
+    should_exit_event: anyio.Event | None = None
 
     @staticmethod
     def handle_exit(*args, **kwargs):
+        # set bool flag before checking the event to avoid race condition
         AppStatus.should_exit = True
+        # Check if event has been initialized, if so notify listeners
+        if AppStatus.should_exit_event is not None:
+            AppStatus.should_exit_event.set()
         original_handler(*args, **kwargs)
 
 
@@ -189,8 +194,19 @@ class EventSourceResponse(Response):
 
     @staticmethod
     async def listen_for_exit_signal() -> None:
-        while not AppStatus.should_exit:
-            await anyio.sleep(1.0)
+        # Check if should_exit was set before anybody started waiting
+        if AppStatus.should_exit:
+            return
+
+        # Setup an Event
+        AppStatus.should_exit_event = anyio.Event()
+
+        # Check if should_exit got set while we set up the event
+        if AppStatus.should_exit:
+            return
+
+        # Await the event
+        await AppStatus.should_exit_event.wait()
 
     async def stream_response(self, send) -> None:
         await send(
@@ -209,7 +225,6 @@ class EventSourceResponse(Response):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         async with anyio.create_task_group() as task_group:
-
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
                 await func()
