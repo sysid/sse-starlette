@@ -28,23 +28,41 @@ build: clean format isort  ## format and build
 .PHONY: upload
 upload:  ## upload to PyPi
 	@echo "upload"
-	twine upload --verbose dist/*
+	#twine upload --verbose dist/*
+	@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep main | grep Bump && \
+		twine upload --verbose dist/* || \
+		echo "Bump Version before trying to upload"
 
 .PHONY: bump-major
 bump-major:  ## bump-major, tag and push
 	bumpversion --commit --tag major
+	git push
 	git push --tags
+	@$(MAKE) create-release
 
 .PHONY: bump-minor
 bump-minor:  ## bump-minor, tag and push
 	bumpversion --commit --tag minor
+	git push
 	git push --tags
+	@$(MAKE) create-release
 
 .PHONY: bump-patch
 bump-patch:  ## bump-patch, tag and push
 	bumpversion --commit --tag patch
+	git push
 	git push --tags
+	@$(MAKE) create-release
 
+.PHONY: create-release
+create-release:  ## create a release on GitHub via the gh cli
+	@if command -v gh version &>/dev/null; then \
+		echo "Creating GitHub release for v$(VERSION)"; \
+		gh release create "v$(VERSION)" --generate-notes; \
+	else \
+		echo "You do not have the github-cli installed. Please create release from the repo manually."; \
+		exit 1; \
+	fi
 
 ################################################################################
 # Testing \
