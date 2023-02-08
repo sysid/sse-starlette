@@ -33,10 +33,10 @@ class AppStatus:
 
 
 try:
-    from uvicorn.main import Server  # type: ignore
+    from uvicorn.main import Server
 
     original_handler = Server.handle_exit
-    Server.handle_exit = AppStatus.handle_exit
+    Server.handle_exit = AppStatus.handle_exit  # type: ignore
 
     def unpatch_uvicorn_signal_handler():
         """restores original signal-handler and rolls back monkey-patching.
@@ -137,11 +137,11 @@ class EventSourceResponse(Response):
     https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
     Responses must not be compressed by middleware in order to work.
+    implementation based on Starlette StreamingResponse
     """
 
     DEFAULT_PING_INTERVAL = 15
 
-    # follow Starlette StreamingResponse
     # noinspection PyMissingConstructor
     def __init__(
         self,

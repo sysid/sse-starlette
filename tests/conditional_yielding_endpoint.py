@@ -22,7 +22,8 @@ async def endless(req: Request):
     """Simulates an endless stream
 
     In case of server shutdown the running task has to be stopped via signal handler in order
-    to enable proper server shutdown. Otherwise there will be dangling tasks preventing proper shutdown.
+    to enable proper server shutdown. Otherwise, there will be dangling tasks preventing proper shutdown.
+    (deadlock)
     """
 
     async def event_publisher():

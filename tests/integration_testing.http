@@ -1,8 +1,17 @@
+###
+
+################################################################################
+# subscribe to conditional_yielding_endpoint.py
+################################################################################
 GET http://localhost:8000/endless
 Accept: application/json
 
 ###
 
+################################################################################
+# Test stream_generator.py
+################################################################################
+# Push messages for stream_generator.py
 # curl -X 'POST'
 #  'http://127.0.0.1:8000/message?message=xxx'
 #  -H 'accept: application/json'
@@ -13,4 +22,8 @@ Content-Type: application/x-www-form-urlencoded
 
 ###
 
+# subscribe to sse endpoint to view the sent messages
+GET http://localhost:8000/sse
+Accept: application/json
 
+###
