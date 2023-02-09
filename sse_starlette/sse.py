@@ -20,7 +20,7 @@ class AppStatus:
     """helper for monkey-patching the signal-handler of uvicorn"""
 
     should_exit = False
-    should_exit_event: anyio.Event | None = None
+    should_exit_event: Union[anyio.Event, None] = None
 
     @staticmethod
     def handle_exit(*args, **kwargs):

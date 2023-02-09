@@ -1,9 +1,14 @@
 
+<a id='changelog-1.3.0'></a>
+# 1.3.0 — 2023-02-09
+
+- replace anyio.sleep() with anyio.Event
+
 <a id='changelog-1.2.1'></a>
 # 1.2.1 — 2022-11-15
 
-add support for custom async iterable objects
-https://github.com/sysid/sse-starlette/pull/43
+- add support for custom async iterable objects
+  https://github.com/sysid/sse-starlette/pull/43
 
 <a id='changelog-1.1.6'></a>
 # 1.1.6 — 2022-07-31
