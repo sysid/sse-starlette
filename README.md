@@ -66,11 +66,6 @@ async def endless(req: Request):
     return EventSourceResponse(event_publisher())
 ```
 
-Run the tests:
-```python
-make test
-```
-
 ## Special use cases
 ### Fan out Proxies
 Fan out proxies usually rely on response being cacheable. To support that, you can set the value of `Cache-Control`.
@@ -80,6 +75,18 @@ return EventSourceResponse(
         generator(), headers={"Cache-Control": "public, max-age=29"}
     )
 ```
+
+
+## Development, Contributing
+Check `Makefile` for available commands and development support, e.g. run the unit tests:
+```python
+make test
+```
+
+For integration testing you can use the provided examples in `tests` and `examples`.
+
+If you are using Postman, please see: https://github.com/sysid/sse-starlette/issues/47#issuecomment-1445953826
+
 
 ## Changelog
 [CHANGELOG.md](https://github.com/sysid/sse-starlette/blob/master/CHANGELOG.md)

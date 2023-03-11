@@ -6,10 +6,15 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.requests import Request
 from uvicorn.config import logger as _log
 
-# example by: justindujardin
-#
-# tests proper shutdown in case no messages are yielded:
-# no yielded messages would get into the old codepath that checks AppStatus
+"""
+example by: justindujardin
+4efaffc2365a85f132ab8fc405110120c9c9e36a
+
+tests proper shutdown in case no messages are yielded:
+- in a streaming endpoint that reports only on "new" data, it is possible to get into a state where no no yields are expected to happen in the near future.
+    e.g. there are no new chat messages to emit.
+- add a third task to taskgroup that checks the uvicorn exit status at a regular interval.
+"""
 
 
 app = FastAPI()

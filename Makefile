@@ -67,12 +67,6 @@ create-release:  ## create a release on GitHub via the gh cli
 ################################################################################
 # Testing \
 TESTING:  ## ############################################################
-.PHONY: coverage
-coverage:  ## Run tests with coverage
-	python -m coverage erase
-	python -m coverage run --include=$(pkg_src)/* -m pytest -ra
-	python -m coverage report -m
-
 .PHONY: test
 test:  ## run tests
 	python -m pytest -ra --junitxml=report.xml --cov-config=setup.cfg --cov-report=xml --cov-report term --cov=$(pkg_src) tests/

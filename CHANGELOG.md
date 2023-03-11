@@ -1,4 +1,10 @@
 
+<a id='changelog-1.3.3'></a>
+# 1.3.3 — 2023-03-11
+
+removal of requirements.txt
+python 3.11 added to tox
+
 <a id='changelog-1.3.0'></a>
 # 1.3.0 — 2023-02-09
 
