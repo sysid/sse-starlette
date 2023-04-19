@@ -4,6 +4,11 @@ from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
+"""
+This examples demonstrates how to use a comment as a ping instead of sending
+a dedicated event type 'ping'.
+"""
+
 app = FastAPI(title=__name__)
 router = APIRouter(prefix="/sse")
 

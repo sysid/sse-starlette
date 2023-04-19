@@ -91,6 +91,8 @@ return EventSourceResponse(
         generator(), headers={"Cache-Control": "public, max-age=29"}
     )
 ```
+### Error Handling
+See example: `examples/error_handling.py`
 
 
 ## Development, Contributing

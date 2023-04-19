@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    const es = new EventSource('sse');
+
+    es.onmessage = function (e) {
+        const data = JSON.parse(event.data);
+
+        if (data.error) {
+            console.error("Error:", data.error);
+            eventSource.close();
+        } else {
+            console.log("Received:", data);
+        }
+    };
+    es.addEventListener('myevent', function (e) {
+        console.log(e.data);
+    });
+
+</script>
+<h1>look at the console</h1>
+</body>
+</html>

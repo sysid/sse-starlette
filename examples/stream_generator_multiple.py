@@ -1,11 +1,12 @@
 import asyncio
+from typing import List
 
 from fastapi import Depends, FastAPI
 from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette import status
 
 """
-This example shows how to use a stream to push messages to a single client
+This example shows how to use multiple streams.
 """
 
 class Stream:
@@ -24,20 +25,26 @@ class Stream:
 
 app = FastAPI()
 
-_stream = Stream()
-app.dependency_overrides[Stream] = lambda: _stream
+# _stream = Stream()
+_streams: List[Stream] = []
+
+
+# app.dependency_overrides[Stream] = lambda: _stream
 
 
 @app.get("/sse")
 async def sse(stream: Stream = Depends()) -> EventSourceResponse:
+    stream = Stream()
+    _streams.append(stream)
     return EventSourceResponse(stream)
 
 
 @app.post("/message", status_code=status.HTTP_201_CREATED)
 async def send_message(message: str, stream: Stream = Depends()) -> None:
-    await stream.asend(
-        ServerSentEvent(data=message)
-    )
+    for stream in _streams:
+        await stream.asend(
+            ServerSentEvent(data=message)
+        )
 
 
 if __name__ == "__main__":
