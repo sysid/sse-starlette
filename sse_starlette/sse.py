@@ -272,7 +272,7 @@ class EventSourceResponse(Response):
             if self.ping_message_factory:
                 assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
-                ServerSentEvent(datetime.utcnow(), event="ping").encode()
+                ServerSentEvent(comment=datetime.utcnow()).encode()
                 if self.ping_message_factory is None
                 else ensure_bytes(self.ping_message_factory())
             )

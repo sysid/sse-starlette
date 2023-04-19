@@ -1,6 +1,6 @@
 import pytest
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
-
+from datetime import datetime
 
 def test_compression_not_implemented():
     response = EventSourceResponse(0)
@@ -20,6 +20,10 @@ def test_compression_not_implemented():
         (
             dict(data="foo", event="bar", id="xyz", retry=1),
             b"id: xyz\r\nevent: bar\r\ndata: foo\r\nretry: 1\r\n\r\n",
+        ),
+        (
+            dict(comment="a comment"),
+            b": a comment\r\n\r\n",
         ),
     ],
 )
