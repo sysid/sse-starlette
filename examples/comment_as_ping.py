@@ -20,6 +20,7 @@ async def handle():
     return EventSourceResponse(
         generator,
         headers={"Server": "nini"},
+        ping=5,
         ping_message_factory=lambda: ServerSentEvent(**{"comment": "You can't see\r\nthis ping"}),
     )
 

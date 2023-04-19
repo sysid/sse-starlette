@@ -67,6 +67,22 @@ async def endless(req: Request):
 ```
 
 ## Special use cases
+### Customize Ping
+By default, the server sends a ping every 15 seconds. You can customize this by: 
+1. setting the `ping` parameter
+2. by changing the `ping` event to a comment event so that it is not visible to the client
+```python
+@router.get("")
+async def handle():
+    generator = numbers(1, 100)
+    return EventSourceResponse(
+        generator,
+        headers={"Server": "nini"},
+        ping=5,
+        ping_message_factory=lambda: ServerSentEvent(**{"comment": "You can't see\r\nthis ping"}),
+    )
+```
+
 ### Fan out Proxies
 Fan out proxies usually rely on response being cacheable. To support that, you can set the value of `Cache-Control`.
 For example:
