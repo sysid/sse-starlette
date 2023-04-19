@@ -1,6 +1,5 @@
 import pytest
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
-from datetime import datetime
 
 def test_compression_not_implemented():
     response = EventSourceResponse(0)
