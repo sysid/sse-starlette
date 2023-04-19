@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 app = FastAPI(title=__name__)
 router = APIRouter(prefix="/sse")
@@ -10,7 +10,6 @@ router = APIRouter(prefix="/sse")
 
 async def numbers(minimum, maximum):
     for i in range(minimum, maximum + 1):
-        yield {"comment": "You can't see\r\nme"}
         await asyncio.sleep(1)
         yield f"You\r\ncan see me and I'm the {i}"
 
@@ -18,7 +17,11 @@ async def numbers(minimum, maximum):
 @router.get("")
 async def handle():
     generator = numbers(1, 100)
-    return EventSourceResponse(generator, headers={"Server": "nini"})
+    return EventSourceResponse(
+        generator,
+        headers={"Server": "nini"},
+        ping_message_factory=lambda: ServerSentEvent(**{"comment": "You can't see\r\nthis ping"}),
+    )
 
 
 app.include_router(router)
