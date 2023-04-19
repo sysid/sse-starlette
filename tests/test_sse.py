@@ -1,6 +1,7 @@
 import pytest
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
+
 def test_compression_not_implemented():
     response = EventSourceResponse(0)
     with pytest.raises(NotImplementedError):
