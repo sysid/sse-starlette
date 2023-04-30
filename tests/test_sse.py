@@ -25,6 +25,10 @@ def test_compression_not_implemented():
             dict(comment="a comment"),
             b": a comment\r\n\r\n",
         ),
+        (
+            dict(data="foo", comment="a comment"),
+            b": a comment\r\ndata: foo\r\n\r\n",
+        ),
     ],
 )
 def test_server_sent_event(input, expected):
