@@ -183,6 +183,7 @@ class EventSourceResponse(Response):
         self.active = True
 
         self._ping_task = None
+        self._send_lock = anyio.Lock()
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:
@@ -224,6 +225,10 @@ class EventSourceResponse(Response):
         await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async def safe_send(message):
+            async with self._send_lock:
+                return await send(message)
+            
         async with anyio.create_task_group() as task_group:
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
@@ -231,8 +236,8 @@ class EventSourceResponse(Response):
                 # noinspection PyAsyncCall
                 task_group.cancel_scope.cancel()
 
-            task_group.start_soon(wrap, partial(self.stream_response, send))
-            task_group.start_soon(wrap, partial(self._ping, send))
+            task_group.start_soon(wrap, partial(self.stream_response, safe_send))
+            task_group.start_soon(wrap, partial(self._ping, safe_send))
             task_group.start_soon(wrap, self.listen_for_exit_signal)
             await wrap(partial(self.listen_for_disconnect, receive))
 
