@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import anyio
+import anyio.lowlevel
 import pytest
 from httpx import AsyncClient
 from sse_starlette import EventSourceResponse
@@ -101,6 +102,30 @@ async def test_endless_full(client, caplog):
                 # The cancel_called property will be True if timeout was reached
                 assert scope.cancel_called is True
                 assert "chunk: data: 3" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_ping_concurrency():
+    lock = anyio.Lock()
+
+    async def event_publisher():
+        for i in range(0, 2):
+            await anyio.sleep(0.5)
+            yield i
+
+    async def send(*args, **kwargs):
+        lock.acquire_nowait()
+        await anyio.sleep(1.0)
+        lock.release()
+
+    async def receive():
+        await anyio.lowlevel.checkpoint()
+        return { "type": "something"}
+
+    response = EventSourceResponse(event_publisher(), ping=1)
+
+    await response({}, receive, send)
+
 
 
 def test_header_charset():
