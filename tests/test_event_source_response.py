@@ -116,7 +116,8 @@ async def test_ping_concurrency():
     async def send(*args, **kwargs):
         lock.acquire_nowait()
         await anyio.sleep(1.0)
-        await lock.release()
+        # noinspection PyAsyncCall
+        lock.release()
 
     async def receive():
         await anyio.lowlevel.checkpoint()
