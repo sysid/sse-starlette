@@ -68,7 +68,7 @@ async def endless(req: Request):
 
 ## Special use cases
 ### Customize Ping
-By default, the server sends a ping every 15 seconds. You can customize this by: 
+By default, the server sends a ping every 15 seconds. You can customize this by:
 1. setting the `ping` parameter
 2. by changing the `ping` event to a comment event so that it is not visible to the client
 ```python
@@ -105,9 +105,6 @@ For integration testing you can use the provided examples in `tests` and `exampl
 
 If you are using Postman, please see: https://github.com/sysid/sse-starlette/issues/47#issuecomment-1445953826
 
-
-## Changelog
-[CHANGELOG.md](https://github.com/sysid/sse-starlette/blob/master/CHANGELOG.md)
 
 <!-- Badges -->
 
