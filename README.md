@@ -96,7 +96,14 @@ See example: `examples/error_handling.py`
 
 
 ## Development, Contributing
-Check `Makefile` for available commands and development support, e.g. run the unit tests:
+1. install pipenv: `pip install pipenv`
+2. install dependencies using pipenv: `pipenv install --dev -e .`
+3. To run tests, either:
+   - `pipenv run pytest`
+ 
+### Makefile
+- make sure your virtualenv is active: `pipenv shell`
+- check `Makefile` for available commands and development support, e.g. run the unit tests:
 ```python
 make test
 ```
