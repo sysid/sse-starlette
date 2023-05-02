@@ -116,16 +116,15 @@ async def test_ping_concurrency():
     async def send(*args, **kwargs):
         lock.acquire_nowait()
         await anyio.sleep(1.0)
-        lock.release()
+        await lock.release()
 
     async def receive():
         await anyio.lowlevel.checkpoint()
-        return { "type": "something"}
+        return {"type": "something"}
 
     response = EventSourceResponse(event_publisher(), ping=1)
 
     await response({}, receive, send)
-
 
 
 def test_header_charset():
