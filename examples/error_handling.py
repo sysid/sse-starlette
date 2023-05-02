@@ -1,10 +1,9 @@
 import asyncio
 from typing import Any
 
-from fastapi import FastAPI, APIRouter, HTTPException
-from starlette.staticfiles import StaticFiles
-
+from fastapi import APIRouter, FastAPI, HTTPException
 from sse_starlette import EventSourceResponse, ServerSentEvent
+from starlette.staticfiles import StaticFiles
 
 """
 This example shows how to handle errors in the generator function.
