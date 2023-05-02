@@ -97,7 +97,6 @@ class ServerSentEvent:
             for chunk in self.LINE_SEP_EXPR.split(str(self.comment)):
                 buffer.write(f": {chunk}")
                 buffer.write(self._sep)
-            return buffer.getvalue().encode("utf-8")
 
         if self.id is not None:
             buffer.write(self.LINE_SEP_EXPR.sub("", f"id: {self.id}"))
@@ -107,9 +106,10 @@ class ServerSentEvent:
             buffer.write(self.LINE_SEP_EXPR.sub("", f"event: {self.event}"))
             buffer.write(self._sep)
 
-        for chunk in self.LINE_SEP_EXPR.split(str(self.data)):
-            buffer.write(f"data: {chunk}")
-            buffer.write(self._sep)
+        if self.data is not None:
+            for chunk in self.LINE_SEP_EXPR.split(str(self.data)):
+                buffer.write(f"data: {chunk}")
+                buffer.write(self._sep)
 
         if self.retry is not None:
             if not isinstance(self.retry, int):
@@ -272,7 +272,7 @@ class EventSourceResponse(Response):
             if self.ping_message_factory:
                 assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
-                ServerSentEvent(datetime.utcnow(), event="ping").encode()
+                ServerSentEvent(comment=f"ping - {datetime.utcnow()}").encode()
                 if self.ping_message_factory is None
                 else ensure_bytes(self.ping_message_factory())
             )
