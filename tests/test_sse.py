@@ -21,6 +21,14 @@ def test_compression_not_implemented():
             dict(data="foo", event="bar", id="xyz", retry=1),
             b"id: xyz\r\nevent: bar\r\ndata: foo\r\nretry: 1\r\n\r\n",
         ),
+        (
+            dict(comment="a comment"),
+            b": a comment\r\n\r\n",
+        ),
+        (
+            dict(data="foo", comment="a comment"),
+            b": a comment\r\ndata: foo\r\n\r\n",
+        ),
     ],
 )
 def test_server_sent_event(input, expected):
