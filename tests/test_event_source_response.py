@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import math
+from functools import partial
 
 import anyio
 import anyio.lowlevel
@@ -53,6 +55,39 @@ def test_sync_event_source_response(input, expected):
 
         generator = numbers(1, 5)
         response = EventSourceResponse(generator, ping=0.2)  # type: ignore
+        await response(scope, receive, send)
+
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.content.decode().count("ping") == 2
+    assert expected in response.content
+    print(response.content)
+
+
+@pytest.mark.parametrize(
+    "input,expected",
+    [
+        ("integer", b"data: 1\r\n\r\n"),
+        ("dict1", b"data: 1\r\n\r\n"),
+        ("dict2", b"event: message\r\ndata: 1\r\n\r\n"),
+    ],
+)
+def test_sync_memory_channel_event_source_response(input, expected):
+    async def app(scope, receive, send):
+        send_chan, recv_chan = anyio.create_memory_object_stream(math.inf)
+        async def numbers(inner_send_chan, minimum, maximum):
+            async with send_chan:
+                for i in range(minimum, maximum + 1):
+                    await anyio.sleep(0.1)
+
+                    if input == "integer":
+                        await inner_send_chan.send(i)
+                    elif input == "dict1":
+                        await inner_send_chan.send(dict(data=i))
+                    elif input == "dict2":
+                        await inner_send_chan.send(dict(data=i, event="message"))
+
+        response = EventSourceResponse(recv_chan, data_sender_callable=partial(numbers, send_chan, 1, 5), ping=0.2)  # type: ignore
         await response(scope, receive, send)
 
     client = TestClient(app)
