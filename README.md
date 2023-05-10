@@ -94,6 +94,12 @@ return EventSourceResponse(
 ### Error Handling
 See example: `examples/error_handling.py`
 
+### Sending Responses without Async Generators
+See example: `examples/no_async_generators.py`
+
+Async generators do not guarantee when things like finally blocks run
+in all cases and so can be a footgun. This shows an alternative implementation
+that does not rely on async generators but instead uses memory channels.
 
 ## Development, Contributing
 1. install pipenv: `pip install pipenv`
