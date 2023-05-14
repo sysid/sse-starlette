@@ -153,6 +153,7 @@ class EventSourceResponse(Response):
         ping: Optional[int] = None,
         sep: Optional[str] = None,
         ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
+        data_sender_callable: Optional[Callable[[], Coroutine[None, None, None]]] = None
     ) -> None:
         self.sep = sep
         self.ping_message_factory = ping_message_factory
@@ -165,6 +166,7 @@ class EventSourceResponse(Response):
         self.status_code = status_code
         self.media_type = self.media_type if media_type is None else media_type
         self.background = background  # type: ignore  # follows https://github.com/encode/starlette/blob/master/starlette/responses.py
+        self.data_sender_callable = data_sender_callable
 
         _headers = {}
         if headers is not None:  # pragma: no cover
@@ -239,6 +241,10 @@ class EventSourceResponse(Response):
             task_group.start_soon(wrap, partial(self.stream_response, safe_send))
             task_group.start_soon(wrap, partial(self._ping, safe_send))
             task_group.start_soon(wrap, self.listen_for_exit_signal)
+
+            if self.data_sender_callable:
+                task_group.start_soon(self.data_sender_callable)
+                
             await wrap(partial(self.listen_for_disconnect, receive))
 
         if self.background is not None:  # pragma: no cover, tested in StreamResponse
