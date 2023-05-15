@@ -202,7 +202,8 @@ class EventSourceResponse(Response):
             return
 
         # Setup an Event
-        AppStatus.should_exit_event = anyio.Event()
+        if AppStatus.should_exit_event is None:
+            AppStatus.should_exit_event = anyio.Event()
 
         # Check if should_exit got set while we set up the event
         if AppStatus.should_exit:
