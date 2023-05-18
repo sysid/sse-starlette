@@ -59,6 +59,7 @@ async def app():
     async with LifespanManager(app):
         print("We're in!")
         yield app
+        print("We're out!")
 
 
 @pytest.fixture
