@@ -10,6 +10,8 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
+from sse_starlette.sse import AppStatus
+
 _log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
 datefmt = "%Y-%m-%d %H:%M:%S"
@@ -61,7 +63,13 @@ async def app():
 
 
 @pytest.fixture
-async def client(app):
+def reset_appstatus_event():
+    # avoid: RuntimeError: <asyncio.locks.Event object at 0x1046a0a30 [unset]> is bound to a different event loop
+    AppStatus.should_exit_event = None
+
+
+@pytest.fixture
+async def client(reset_appstatus_event, app):
     async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as client:
         print("Yielding Client")
         yield client

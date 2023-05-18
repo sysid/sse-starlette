@@ -41,7 +41,7 @@ server shut down gracefully, no pending tasks
         ("dict2", b"event: message\r\ndata: 1\r\n\r\n"),
     ],
 )
-def test_sync_event_source_response(input, expected):
+async def test_sync_event_source_response(reset_appstatus_event, input, expected):
     async def app(scope, receive, send):
         async def numbers(minimum, maximum):
             for i in range(minimum, maximum + 1):
@@ -72,9 +72,12 @@ def test_sync_event_source_response(input, expected):
         ("dict2", b"event: message\r\ndata: 1\r\n\r\n"),
     ],
 )
-def test_sync_memory_channel_event_source_response(input, expected):
+def test_sync_memory_channel_event_source_response(
+    reset_appstatus_event, input, expected
+):
     async def app(scope, receive, send):
         send_chan, recv_chan = anyio.create_memory_object_stream(math.inf)
+
         async def numbers(inner_send_chan, minimum, maximum):
             async with send_chan:
                 for i in range(minimum, maximum + 1):
@@ -87,7 +90,9 @@ def test_sync_memory_channel_event_source_response(input, expected):
                     elif input == "dict2":
                         await inner_send_chan.send(dict(data=i, event="message"))
 
-        response = EventSourceResponse(recv_chan, data_sender_callable=partial(numbers, send_chan, 1, 5), ping=0.2)  # type: ignore
+        response = EventSourceResponse(
+            recv_chan, data_sender_callable=partial(numbers, send_chan, 1, 5), ping=0.2
+        )  # type: ignore
         await response(scope, receive, send)
 
     client = TestClient(app)
@@ -98,7 +103,7 @@ def test_sync_memory_channel_event_source_response(input, expected):
 
 
 @pytest.mark.anyio
-async def test_endless():
+async def test_endless(reset_appstatus_event):
     async def app(scope, receive, send):
         async def event_publisher():
             i = 0
@@ -140,7 +145,7 @@ async def test_endless_full(client, caplog):
 
 
 @pytest.mark.anyio
-async def test_ping_concurrency():
+async def test_ping_concurrency(reset_appstatus_event):
     # Sequencing here is as follows:
     # t=0.5s - event_publisher sends the first response item,
     #          claiming the lock and going to sleep for 1 second so until t=1.5s.

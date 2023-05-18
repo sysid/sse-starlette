@@ -153,7 +153,9 @@ class EventSourceResponse(Response):
         ping: Optional[int] = None,
         sep: Optional[str] = None,
         ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
-        data_sender_callable: Optional[Callable[[], Coroutine[None, None, None]]] = None
+        data_sender_callable: Optional[
+            Callable[[], Coroutine[None, None, None]]
+        ] = None,
     ) -> None:
         self.sep = sep
         self.ping_message_factory = ping_message_factory
@@ -231,7 +233,7 @@ class EventSourceResponse(Response):
         async def safe_send(message):
             async with self._send_lock:
                 return await send(message)
-            
+
         async with anyio.create_task_group() as task_group:
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
@@ -245,7 +247,7 @@ class EventSourceResponse(Response):
 
             if self.data_sender_callable:
                 task_group.start_soon(self.data_sender_callable)
-                
+
             await wrap(partial(self.listen_for_disconnect, receive))
 
         if self.background is not None:  # pragma: no cover, tested in StreamResponse
