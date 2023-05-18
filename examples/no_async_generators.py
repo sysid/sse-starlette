@@ -1,10 +1,10 @@
-import anyio
 import logging
-from anyio.streams.memory import MemoryObjectSendStream
 from functools import partial
 
+import anyio
 import trio
 import uvicorn
+from anyio.streams.memory import MemoryObjectSendStream
 from fastapi import FastAPI
 from sse_starlette.sse import EventSourceResponse
 from starlette.requests import Request
