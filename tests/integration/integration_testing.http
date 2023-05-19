@@ -1,7 +1,7 @@
 ###
 
 ################################################################################
-# subscribe to conditional_yielding_endpoint.py
+# subscribe to ./main_endless_conditional.py
 ################################################################################
 GET http://localhost:8000/endless
 Accept: application/json
@@ -9,7 +9,7 @@ Accept: application/json
 ###
 
 ################################################################################
-# Test stream_generator.py
+# Test examples/stream_generator.py
 ################################################################################
 # Push messages for stream_generator.py
 # curl -X 'POST'

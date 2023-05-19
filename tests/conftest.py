@@ -4,17 +4,23 @@ import logging
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
+from starlette.testclient import TestClient
+
 from sse_starlette import EventSourceResponse
 from sse_starlette.sse import AppStatus
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
+
 from starlette.routing import Route
 
 _log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
 datefmt = "%Y-%m-%d %H:%M:%S"
 logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
+
+logging.getLogger("httpx").setLevel(logging.INFO)
+logging.getLogger("httpcore").setLevel(logging.INFO)
 
 
 @pytest.fixture
@@ -26,10 +32,10 @@ def anyio_backend():
 @pytest.fixture
 async def app():
     async def startup():
-        print("Starting up")
+        _log.debug("Starting up")
 
     async def shutdown():
-        print("Shutting down")
+        _log.debug("Shutting down")
 
     async def home(request):
         return PlainTextResponse("Hello, world!")
@@ -41,6 +47,7 @@ async def app():
                 while True:  # i <= 20:
                     # yield dict(id=..., event=..., data=...)
                     i += 1
+                    print(f"Sending {i}")
                     yield dict(data=i)
                     await asyncio.sleep(0.3)
             except asyncio.CancelledError as e:
@@ -57,9 +64,9 @@ async def app():
     )
 
     async with LifespanManager(app):
-        print("We're in!")
+        _log.info("We're in!")
         yield app
-        print("We're out!")
+        _log.info("We're out!")
 
 
 @pytest.fixture
@@ -69,7 +76,14 @@ def reset_appstatus_event():
 
 
 @pytest.fixture
-async def client(reset_appstatus_event, app):
+async def httpx_client(reset_appstatus_event, app):
     async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as client:
+        _log.info("Yielding Client")
+        yield client
+
+
+@pytest.fixture
+def client(reset_appstatus_event, app):
+    with TestClient(app=app, base_url="http://localhost:8000") as client:
         print("Yielding Client")
         yield client

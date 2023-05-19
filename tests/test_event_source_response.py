@@ -6,7 +6,6 @@ from functools import partial
 import anyio
 import anyio.lowlevel
 import pytest
-from httpx import AsyncClient
 from sse_starlette import EventSourceResponse
 from starlette.testclient import TestClient
 
@@ -82,39 +81,8 @@ def test_sync_memory_channel_event_source_response(
     print(response.content)
 
 
-@pytest.mark.skip("not working")
 @pytest.mark.anyio
-async def test_endless(reset_appstatus_event):
-    async def app(scope, receive, send):
-        async def event_publisher():
-            i = 0
-            try:
-                while True:
-                    i += 1
-                    _log.info(f"yielding {i=}")
-                    yield dict(data=i)
-                    await asyncio.sleep(0.9)
-            except asyncio.CancelledError as e:
-                raise e
-
-        response = EventSourceResponse(event_publisher())
-        await response(scope, receive, send)
-
-    with pytest.raises(TimeoutError):
-        async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
-            with anyio.fail_after(1) as scope:
-                async with anyio.create_task_group() as tg:
-                    async with client.stream("GET", "/") as response:
-                        # https://www.python-httpx.org/async/#streaming-responses
-                        async for chunk in response.aiter_lines():
-                            print(chunk)
-                            # if "data" in chunk:
-                            #     break
-                        # pass
-
-
-@pytest.mark.anyio
-async def test_endless_full(client, caplog):
+async def test_disconnect_from_client(httpx_client, caplog):
     caplog.set_level(logging.DEBUG)
 
     with pytest.raises(TimeoutError):
@@ -122,11 +90,12 @@ async def test_endless_full(client, caplog):
             try:
                 async with anyio.create_task_group() as tg:
                     # https://www.python-httpx.org/async/#streaming-responses
-                    tg.start_soon(client.get, "/endless")
+                    tg.start_soon(httpx_client.get, "/endless")
             finally:
                 # The cancel_called property will be True if timeout was reached
                 assert scope.cancel_called is True
-                assert "chunk: data: 3" in caplog.text
+                assert "chunk: data: 4" in caplog.text
+                assert "Disconnected from client" in caplog.text
 
 
 @pytest.mark.anyio
