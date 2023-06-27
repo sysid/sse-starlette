@@ -48,12 +48,6 @@ except ModuleNotFoundError:
     _log.debug("Uvicorn not used.")
 
 
-class SseState(enum.Enum):
-    CONNECTING = 0
-    OPENED = 1
-    CLOSED = 2
-
-
 class ServerSentEvent:
     def __init__(
         self,
