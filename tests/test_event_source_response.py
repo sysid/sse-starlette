@@ -13,14 +13,15 @@ _log = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize(
-    "input,expected",
+    "input,sep,expected",
     [
-        ("integer", b"data: 1\r\n\r\n"),
-        ("dict1", b"data: 1\r\n\r\n"),
-        ("dict2", b"event: message\r\ndata: 1\r\n\r\n"),
+        ("integer", "\r\n", b"data: 1\r\n\r\n"),
+        ("dict1", "\r\n", b"data: 1\r\n\r\n"),
+        ("dict2", "\r\n", b"event: message\r\ndata: 1\r\n\r\n"),
+        ("dict2", "\r", b"event: message\rdata: 1\r\r"),
     ],
 )
-async def test_sync_event_source_response(reset_appstatus_event, input, expected):
+async def test_sync_event_source_response(reset_appstatus_event, input, sep, expected):
     async def app(scope, receive, send):
         async def numbers(minimum, maximum):
             for i in range(minimum, maximum + 1):
@@ -33,7 +34,7 @@ async def test_sync_event_source_response(reset_appstatus_event, input, expected
                     yield dict(data=i, event="message")
 
         generator = numbers(1, 5)
-        response = EventSourceResponse(generator, ping=0.2)  # type: ignore
+        response = EventSourceResponse(generator, ping=0.2, sep=sep)  # type: ignore
         await response(scope, receive, send)
 
     client = TestClient(app)

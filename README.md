@@ -4,6 +4,8 @@
 [![Build Status][build-image]][build-url]
 [![Code Coverage][coverage-image]][coverage-url]
 
+> Implements the [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) specification.
+
 Background: https://sysid.github.io/server-sent-events/
 
 Installation:

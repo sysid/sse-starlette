@@ -1,5 +1,5 @@
 import pytest
-from sse_starlette.sse import EventSourceResponse, ServerSentEvent
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent, ensure_bytes
 
 
 def test_compression_not_implemented():
@@ -22,6 +22,10 @@ def test_compression_not_implemented():
             b"id: xyz\r\nevent: bar\r\ndata: foo\r\nretry: 1\r\n\r\n",
         ),
         (
+            dict(data="foo", event="bar", id="xyz", retry=1, sep="\n"),
+            b"id: xyz\nevent: bar\ndata: foo\nretry: 1\n\n",
+        ),
+        (
             dict(comment="a comment"),
             b": a comment\r\n\r\n",
         ),
@@ -37,6 +41,19 @@ def test_server_sent_event(input, expected):
         assert ServerSentEvent(input).encode() == expected
     else:
         assert ServerSentEvent(**input).encode() == expected
+
+
+@pytest.mark.parametrize(
+    "input, expected",
+    [
+        (b"data: foo\r\n\r\n", b"data: foo\r\n\r\n"),
+        ("foo", b"data: foo\n\n"),
+        (dict(data="foo", event="bar"), b"event: bar\ndata: foo\n\n"),
+    ],
+)
+def test_ensure_bytes(input, expected):
+    print(input, expected)
+    assert ensure_bytes(input, sep="\n") == expected
 
 
 @pytest.mark.parametrize(

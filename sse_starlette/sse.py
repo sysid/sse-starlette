@@ -114,15 +114,16 @@ class ServerSentEvent:
         return buffer.getvalue().encode("utf-8")
 
 
-def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any]) -> bytes:
+def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> bytes:
     if isinstance(data, bytes):
         return data
     elif isinstance(data, ServerSentEvent):
         return data.encode()
     elif isinstance(data, dict):
+        data["sep"] = sep
         return ServerSentEvent(**data).encode()
     else:
-        return ServerSentEvent(str(data)).encode()
+        return ServerSentEvent(str(data), sep=sep).encode()
 
 
 class EventSourceResponse(Response):
@@ -150,6 +151,8 @@ class EventSourceResponse(Response):
             Callable[[], Coroutine[None, None, None]]
         ] = None,
     ) -> None:
+        if sep is not None and sep not in ["\r\n", "\r", "\n"]:
+            raise ValueError(f"sep must be one of: \\r\\n, \\r, \\n, got: {sep}")
         self.sep = sep
         self.ping_message_factory = ping_message_factory
         if isinstance(content, AsyncIterable):
@@ -216,7 +219,7 @@ class EventSourceResponse(Response):
             }
         )
         async for data in self.body_iterator:
-            chunk = ensure_bytes(data)
+            chunk = ensure_bytes(data, self.sep)
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
@@ -281,7 +284,7 @@ class EventSourceResponse(Response):
             ping = (
                 ServerSentEvent(comment=f"ping - {datetime.utcnow()}").encode()
                 if self.ping_message_factory is None
-                else ensure_bytes(self.ping_message_factory())
+                else ensure_bytes(self.ping_message_factory(), self.sep)
             )
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
