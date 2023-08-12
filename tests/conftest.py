@@ -4,15 +4,13 @@ import logging
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
-from starlette.testclient import TestClient
-
 from sse_starlette import EventSourceResponse
 from sse_starlette.sse import AppStatus
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
-
 from starlette.routing import Route
+from starlette.testclient import TestClient
 
 _log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"

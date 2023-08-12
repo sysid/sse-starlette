@@ -21,18 +21,14 @@ LOG_LEVEL = "info"
 def run_server():
     # noinspection PyGlobalUndefined
     global server_process
-    server_command = (
-        f"uvicorn tests.integration.main_endless:app --host localhost --port {PORT} --log-level {LOG_LEVEL}"
-    )
+    server_command = f"uvicorn tests.integration.main_endless:app --host localhost --port {PORT} --log-level {LOG_LEVEL}"
     server_process = subprocess.Popen(server_command, shell=True)
 
 
 def run_server_conditional():
     # noinspection PyGlobalUndefined
     global server_process
-    server_command = (
-        f"uvicorn tests.integration.main_endless_conditional:app --host localhost --port {PORT} --log-level {LOG_LEVEL}"
-    )
+    server_command = f"uvicorn tests.integration.main_endless_conditional:app --host localhost --port {PORT} --log-level {LOG_LEVEL}"
     server_process = subprocess.Popen(server_command, shell=True)
 
 
