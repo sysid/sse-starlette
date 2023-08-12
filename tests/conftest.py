@@ -35,7 +35,7 @@ async def app():
     async def shutdown():
         _log.debug("Shutting down")
 
-    async def home(request):
+    async def home():
         return PlainTextResponse("Hello, world!")
 
     async def endless(req: Request):

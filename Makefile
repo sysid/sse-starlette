@@ -29,7 +29,7 @@ build: clean format isort  ## format and build
 upload:  ## upload to PyPi
 	@echo "upload"
 	#twine upload --verbose dist/*
-	@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep master | grep Bump && \
+	@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep main | grep Bump && \
 		twine upload --verbose dist/* || \
 		echo "Bump Version before trying to upload"
 
