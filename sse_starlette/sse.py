@@ -67,10 +67,13 @@ class ServerSentEvent:
             be dispatched on the browser to the listener for the specified
             event name; the web site would use addEventListener() to listen
             for named events. The default event type is "message".
-        :param int retry: The reconnection time to use when attempting to send
-            the event. [What code handles this?] This must be an integer,
-            specifying the reconnection time in milliseconds. If a non-integer
-            value is specified, the field is ignored.
+        :param int retry: Instruct the client to try reconnecting after *at least* the
+            given number of milliseconds has passed in case of connection loss. Setting
+            to 0 does not prevent reconnect attempts, a clean disconnect must be
+            implemented on top of the SSE protocol if required (eg. as a special event
+            type). The spec requires client to not attempt reconnecting if it receives a
+            HTTP 204 No Content response. If a non-integer value is specified, the field
+            is ignored.
         :param str comment: A colon as the first character of a line is essence
             a comment, and is ignored. Usually used as a ping message to keep connecting.
             If set, this will be a comment message.
