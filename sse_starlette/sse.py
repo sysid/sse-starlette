@@ -53,7 +53,7 @@ class ServerSentEvent:
         data: Optional[Any] = None,
         *,
         event: Optional[str] = None,
-        id: Optional[int] = None,
+        id: Optional[str] = None,
         retry: Optional[int] = None,
         comment: Optional[str] = None,
         sep: Optional[str] = None,
