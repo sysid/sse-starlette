@@ -12,6 +12,8 @@ from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
 _log = logging.getLogger(__name__)
+using_uvicorn = False
+graceful_shutdown_timeout = None
 
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
@@ -23,8 +25,13 @@ class AppStatus:
 
     @staticmethod
     def handle_exit(*args, **kwargs):
+        global graceful_shutdown_timeout
         # set bool flag before checking the event to avoid race condition
         AppStatus.should_exit = True
+
+        if using_uvicorn:
+            graceful_shutdown_timeout = args[0].config.timeout_graceful_shutdown
+
         # Check if event has been initialized, if so notify listeners
         if AppStatus.should_exit_event is not None:
             AppStatus.should_exit_event.set()
@@ -36,6 +43,7 @@ try:
 
     original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit  # type: ignore
+    using_uvicorn = True
 
     def unpatch_uvicorn_signal_handler():
         """restores original signal-handler and rolls back monkey-patching.
@@ -212,6 +220,13 @@ class EventSourceResponse(Response):
 
         # Await the event
         await AppStatus.should_exit_event.wait()
+        if using_uvicorn:
+            if graceful_shutdown_timeout is not None:
+                await anyio.sleep(graceful_shutdown_timeout)
+            else:
+                # Uvicorn waits indefinitely for tasks to complete if
+                # graceful_shutdown_timeout is None.
+                await anyio.sleep_forever()
 
     async def stream_response(self, send) -> None:
         await send(
