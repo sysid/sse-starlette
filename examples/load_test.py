@@ -6,6 +6,7 @@ import json
 from fastapi import FastAPI, Request
 from sse_starlette.sse import EventSourceResponse, EventSourceResponseNoPing
 from sse_starlette.sse2 import EventSourceResponse2
+from sse_starlette.sse3 import EventSourceResponse3
 
 position = (
     json.dumps(
@@ -41,11 +42,15 @@ async def message_stream(request: Request):
                 break
 
             for p in positions:
+                # fixes socket.send() raised exception, but makes it very slow!!
+                # if await request.is_disconnected():
+                #     break
                 yield p
 
     # return EventSourceResponse(event_generator())
     # return EventSourceResponse2(event_generator())
-    return EventSourceResponseNoPing(event_generator())
+    return EventSourceResponse3(event_generator())
+    # return EventSourceResponseNoPing(event_generator())
 
 
 if __name__ == "__main__":

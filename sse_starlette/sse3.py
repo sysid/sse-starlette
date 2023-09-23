@@ -11,125 +11,13 @@ from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
+from sse_starlette import ServerSentEvent
+from sse_starlette.sse import AppStatus, ensure_bytes
+
 _log = logging.getLogger(__name__)
 
 
-# https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
-class AppStatus:
-    """helper for monkey-patching the signal-handler of uvicorn"""
-
-    should_exit = False
-    should_exit_event: Union[anyio.Event, None] = None
-
-    @staticmethod
-    def handle_exit(*args, **kwargs):
-        # set bool flag before checking the event to avoid race condition
-        AppStatus.should_exit = True
-        # Check if event has been initialized, if so notify listeners
-        if AppStatus.should_exit_event is not None:
-            AppStatus.should_exit_event.set()
-        original_handler(*args, **kwargs)
-
-
-try:
-    from uvicorn.main import Server
-
-    original_handler = Server.handle_exit
-    Server.handle_exit = AppStatus.handle_exit  # type: ignore
-
-    def unpatch_uvicorn_signal_handler():
-        """restores original signal-handler and rolls back monkey-patching.
-        Normally this should not be necessary.
-        """
-        Server.handle_exit = original_handler
-
-except ModuleNotFoundError:
-    _log.debug("Uvicorn not used.")
-
-
-class ServerSentEvent:
-    def __init__(
-        self,
-        data: Optional[Any] = None,
-        *,
-        event: Optional[str] = None,
-        id: Optional[str] = None,
-        retry: Optional[int] = None,
-        comment: Optional[str] = None,
-        sep: Optional[str] = None,
-    ) -> None:
-        """Send data using EventSource protocol
-
-        :param str data: The data field for the message.
-        :param str id: The event ID to set the EventSource object's last
-            event ID value to.
-        :param str event: The event's type. If this is specified, an event will
-            be dispatched on the browser to the listener for the specified
-            event name; the web site would use addEventListener() to listen
-            for named events. The default event type is "message".
-        :param int retry: Instruct the client to try reconnecting after *at least* the
-            given number of milliseconds has passed in case of connection loss. Setting
-            to 0 does not prevent reconnect attempts, a clean disconnect must be
-            implemented on top of the SSE protocol if required (eg. as a special event
-            type). The spec requires client to not attempt reconnecting if it receives a
-            HTTP 204 No Content response. If a non-integer value is specified, the field
-            is ignored.
-        :param str comment: A colon as the first character of a line is essence
-            a comment, and is ignored. Usually used as a ping message to keep connecting.
-            If set, this will be a comment message.
-        """
-        self.data = data
-        self.event = event
-        self.id = id
-        self.retry = retry
-        self.comment = comment
-        self.DEFAULT_SEPARATOR = "\r\n"
-        self.LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
-        self._sep = sep if sep is not None else self.DEFAULT_SEPARATOR
-
-    def encode(self) -> bytes:
-        buffer = io.StringIO()
-        if self.comment is not None:
-            for chunk in self.LINE_SEP_EXPR.split(str(self.comment)):
-                buffer.write(f": {chunk}")
-                buffer.write(self._sep)
-
-        if self.id is not None:
-            buffer.write(self.LINE_SEP_EXPR.sub("", f"id: {self.id}"))
-            buffer.write(self._sep)
-
-        if self.event is not None:
-            buffer.write(self.LINE_SEP_EXPR.sub("", f"event: {self.event}"))
-            buffer.write(self._sep)
-
-        if self.data is not None:
-            for chunk in self.LINE_SEP_EXPR.split(str(self.data)):
-                buffer.write(f"data: {chunk}")
-                buffer.write(self._sep)
-
-        if self.retry is not None:
-            if not isinstance(self.retry, int):
-                raise TypeError("retry argument must be int")
-            buffer.write(f"retry: {self.retry}")
-            buffer.write(self._sep)
-
-        buffer.write(self._sep)
-        return buffer.getvalue().encode("utf-8")
-
-
-def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> bytes:
-    if isinstance(data, bytes):
-        return data
-    elif isinstance(data, ServerSentEvent):
-        return data.encode()
-    elif isinstance(data, dict):
-        data["sep"] = sep
-        return ServerSentEvent(**data).encode()
-    else:
-        return ServerSentEvent(str(data), sep=sep).encode()
-
-
-class EventSourceResponse(Response):
+class EventSourceResponse3(Response):
     """Implements the ServerSentEvent Protocol:
     https://www.w3.org/TR/2009/WD-eventsource-20090421/
 
@@ -186,6 +74,8 @@ class EventSourceResponse(Response):
         self.active = True
 
         self._ping_task = None
+
+        # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
         self._send_lock = anyio.Lock()
 
     @staticmethod
@@ -223,17 +113,15 @@ class EventSourceResponse(Response):
             }
         )
         async for data in self.body_iterator:
-            chunk = ensure_bytes(data, self.sep);
+            chunk = ensure_bytes(data, self.sep)
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
-        await send({"type": "http.response.body", "body": b"", "more_body": False})
+        async with self._send_lock:
+            self.active = False
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async def safe_send(message):
-            async with self._send_lock:
-                return await send(message)
-
         async with anyio.create_task_group() as task_group:
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
@@ -291,25 +179,6 @@ class EventSourceResponse(Response):
                 else ensure_bytes(self.ping_message_factory(), self.sep)
             )
             _log.debug(f"ping: {ping.decode()}")
-            await send({"type": "http.response.body", "body": ping, "more_body": True})
-
-
-class EventSourceResponseNoPing(EventSourceResponse):
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async with anyio.create_task_group() as task_group:
-            # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
-            async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
-                await func()
-                # noinspection PyAsyncCall
-                task_group.cancel_scope.cancel()
-
-            task_group.start_soon(wrap, partial(self.stream_response, send))
-            task_group.start_soon(wrap, self.listen_for_exit_signal)
-
-            if self.data_sender_callable:
-                task_group.start_soon(self.data_sender_callable)
-
-            await wrap(partial(self.listen_for_disconnect, receive))
-
-        if self.background is not None:  # pragma: no cover, tested in StreamResponse
-            await self.background()
+            async with self._send_lock:
+                if self.active:
+                    await send({"type": "http.response.body", "body": ping, "more_body": True})
