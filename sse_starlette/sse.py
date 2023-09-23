@@ -214,19 +214,19 @@ class EventSourceResponse(Response):
         await AppStatus.should_exit_event.wait()
 
     async def stream_response(self, send) -> None:
-        await send(
-            {
-                "type": "http.response.start",
-                "status": self.status_code,
-                "headers": self.raw_headers,
-            }
-        )
-        async for data in self.body_iterator:
-            chunk = ensure_bytes(data, self.sep)
-            _log.debug(f"chunk: {chunk.decode()}")
-            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": self.status_code,
+                    "headers": self.raw_headers,
+                }
+            )
+            async for data in self.body_iterator:
+                chunk = ensure_bytes(data, self.sep)
+                _log.debug(f"chunk: {chunk.decode()}")
+                await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
-        await send({"type": "http.response.body", "body": b"", "more_body": False})
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         async def safe_send(message):
@@ -291,3 +291,24 @@ class EventSourceResponse(Response):
             )
             _log.debug(f"ping: {ping.decode()}")
             await send({"type": "http.response.body", "body": ping, "more_body": True})
+
+
+class EventSourceResponseNoPing(EventSourceResponse):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with anyio.create_task_group() as task_group:
+            # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
+            async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
+                await func()
+                # noinspection PyAsyncCall
+                task_group.cancel_scope.cancel()
+
+            task_group.start_soon(wrap, partial(self.stream_response, send))
+            task_group.start_soon(wrap, self.listen_for_exit_signal)
+
+            if self.data_sender_callable:
+                task_group.start_soon(self.data_sender_callable)
+
+            await wrap(partial(self.listen_for_disconnect, receive))
+
+        if self.background is not None:  # pragma: no cover, tested in StreamResponse
+            await self.background()
