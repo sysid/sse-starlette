@@ -106,9 +106,6 @@ async def test_ping_concurrency(reset_appstatus_event):
     #          claiming the lock and going to sleep for 1 second so until t=1.5s.
     # t=1.0s - ping task wakes up and tries to call send while we know
     #          that event_publisher is still blocked inside it and holding the lock
-    #
-    # If there are concurrent calls to `send` then we will raise the WouldBlock below
-    # and the test would fail so it merely not failing indicates that the behavior is good
     lock = anyio.Lock()
 
     async def event_publisher():
@@ -127,9 +124,10 @@ async def test_ping_concurrency(reset_appstatus_event):
         await anyio.lowlevel.checkpoint()
         return {"type": "something"}
 
-    response = EventSourceResponse(event_publisher(), ping=1)
+    with pytest.raises(anyio.WouldBlock) as e:
+        response = EventSourceResponse(event_publisher(), ping=1)
 
-    await response({}, receive, send)
+        await response({}, receive, send)
 
 
 def test_header_charset():
