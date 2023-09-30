@@ -186,6 +186,8 @@ class EventSourceResponse(Response):
         self.active = True
 
         self._ping_task = None
+
+        # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
         self._send_lock = anyio.Lock()
 
     @staticmethod
@@ -226,13 +228,11 @@ class EventSourceResponse(Response):
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
-        await send({"type": "http.response.body", "body": b"", "more_body": False})
+        async with self._send_lock:
+            self.active = False
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async def safe_send(message):
-            async with self._send_lock:
-                return await send(message)
-
         async with anyio.create_task_group() as task_group:
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
@@ -240,8 +240,8 @@ class EventSourceResponse(Response):
                 # noinspection PyAsyncCall
                 task_group.cancel_scope.cancel()
 
-            task_group.start_soon(wrap, partial(self.stream_response, safe_send))
-            task_group.start_soon(wrap, partial(self._ping, safe_send))
+            task_group.start_soon(wrap, partial(self.stream_response, send))
+            task_group.start_soon(wrap, partial(self._ping, send))
             task_group.start_soon(wrap, self.listen_for_exit_signal)
 
             if self.data_sender_callable:
@@ -290,4 +290,8 @@ class EventSourceResponse(Response):
                 else ensure_bytes(self.ping_message_factory(), self.sep)
             )
             _log.debug(f"ping: {ping.decode()}")
-            await send({"type": "http.response.body", "body": ping, "more_body": True})
+            async with self._send_lock:
+                if self.active:
+                    await send(
+                        {"type": "http.response.body", "body": ping, "more_body": True}
+                    )
