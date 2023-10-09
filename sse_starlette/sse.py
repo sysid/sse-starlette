@@ -103,7 +103,11 @@ class ServerSentEvent:
             buffer.write(self._sep)
 
         if self.data is not None:
-            for chunk in self.LINE_SEP_EXPR.split(str(self.data)):
+            if isinstance(self.data, dict):
+                data_str = json.dumps(self.data)
+            else:
+                data_str = str(self.data)
+            for chunk in self.LINE_SEP_EXPR.split(data_str):
                 buffer.write(f"data: {chunk}")
                 buffer.write(self._sep)
 
