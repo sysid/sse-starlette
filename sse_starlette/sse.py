@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import re
 from datetime import datetime
@@ -103,11 +104,7 @@ class ServerSentEvent:
             buffer.write(self._sep)
 
         if self.data is not None:
-            if isinstance(self.data, dict):
-                data_str = json.dumps(self.data)
-            else:
-                data_str = str(self.data)
-            for chunk in self.LINE_SEP_EXPR.split(data_str):
+            for chunk in self.LINE_SEP_EXPR.split(json.dumps(self.data)):
                 buffer.write(f"data: {chunk}")
                 buffer.write(self._sep)
 
