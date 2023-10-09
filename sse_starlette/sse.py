@@ -104,7 +104,12 @@ class ServerSentEvent:
             buffer.write(self._sep)
 
         if self.data is not None:
-            for chunk in self.LINE_SEP_EXPR.split(json.dumps(self.data)):
+            try:
+                data_str = json.dumps(self.data)
+            except TypeError:
+                # Handle if it's not JSON serializable
+                data_str = str(self.data)
+            for chunk in self.LINE_SEP_EXPR.split(data_str):
                 buffer.write(f"data: {chunk}")
                 buffer.write(self._sep)
 
