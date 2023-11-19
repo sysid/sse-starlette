@@ -1,6 +1,120 @@
 [build-system]
-requires = [
-    "setuptools >= 42",
-    "wheel"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project]
+name = "sse-starlette"
+version = "1.8.0"
+description = "SSE plugin for Starlette"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.8"
+authors = [
+    { name = "sysid", email = "sysid@gmx.de" },
 ]
-build-backend = "setuptools.build_meta"
+url = "https://github.com/sysid/sse-starlette"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+    "starlette",
+    "uvicorn",
+    "fastapi",
+    "anyio",
+]
+[project.urls]
+Source = "https://github.com/sysid/sse-starlette"
+
+[tool.bumpversion]
+current_version = "1.8.0"
+commit = true
+tag = false
+message = "Bump version to {new_version}"
+
+[tool.bumpversion.file_patterns]
+"sset_starlette/__init__.py" = [
+    {search = "__version__ = '{current_version}'", replace = "__version__ = '{new_version}'"},
+]
+"VERSION" = [
+    {search = "{current_version}", replace = "{new_version}"},
+]
+"pyproject.toml" = [
+    {search = "version = {current_version}", replace = "version = {new_version}"},
+]
+
+[[tool.bumpversion.files]]
+filename = "VERSION"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "sse_starlette/__init__.py"
+
+[tool.pdm.build]
+excludes = ["./**/.git"]
+package-dir = "src"
+includes = ["sse_starlette"]
+source-includes = ["tests", "CHANGELOG.md", "LICENSE", "README.md", "tox.ini"]
+# editables backend doesn't work well with namespace packages
+editable-backend = "path"
+
+[[tool.pdm.source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "mypy",
+    "codecov",
+    "isort",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "httpx",
+    "asgi-lifespan",
+    "psutil",
+]
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests",
+]
+asyncio_mode = "auto"
+#addopts = "--cov=my_package --cov-report=term-missing"
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+
+[tool.mypy]
+ignore_missing_imports = false
+namespace_packages = true
+
+[tool.coverage.run]
+source = ["sse_starlette"]
+omit = [
+    "tests/*",
+    "**/__main__.py",
+    "**/.venv/*",
+    "**/site-packages/*",
+]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 85
