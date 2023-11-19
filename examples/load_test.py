@@ -7,8 +7,9 @@
 # curl http://localhost:8000/stream | pv --line-mode --average-rate > /dev/null
 ################################################################################
 
-import uvicorn
 import json
+
+import uvicorn
 from fastapi import FastAPI, Request
 from sse_starlette.sse import EventSourceResponse
 
