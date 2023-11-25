@@ -18,7 +18,7 @@ from typing import (
 import anyio
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
-from starlette.responses import AsyncContentStream, ContentStream, Response
+from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
 _log = logging.getLogger(__name__)
@@ -137,6 +137,12 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> by
         return ServerSentEvent(**data).encode()
     else:
         return ServerSentEvent(str(data), sep=sep).encode()
+
+
+Content = Union[str, bytes, dict, ServerSentEvent]
+SyncContentStream = Iterator[Content]
+AsyncContentStream = AsyncIterable[Content]
+ContentStream = Union[AsyncContentStream, SyncContentStream]
 
 
 class EventSourceResponse(Response):
