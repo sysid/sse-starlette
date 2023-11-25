@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "sse-starlette"
-version = "1.8.1"
+version = "1.8.2"
 description = "SSE plugin for Starlette"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
@@ -36,7 +36,7 @@ dependencies = [
 Source = "https://github.com/sysid/sse-starlette"
 
 [tool.bumpversion]
-current_version = "1.8.1"
+current_version = "1.8.2"
 commit = true
 tag = false
 message = "Bump version to {new_version}"
