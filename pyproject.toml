@@ -85,6 +85,7 @@ dev = [
     "httpx",
     "asgi-lifespan",
     "psutil",
+    "black>=23.11.0",
 ]
 [tool.pytest.ini_options]
 markers = [
