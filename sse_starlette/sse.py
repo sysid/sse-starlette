@@ -147,7 +147,7 @@ ContentStream = Union[AsyncContentStream, SyncContentStream]
 
 class EventSourceResponse(Response):
     """Implements the ServerSentEvent Protocol:
-    https://www.w3.org/TR/2009/WD-eventsource-20090421/
+    https://html.spec.whatwg.org/multipage/server-sent-events.html
 
     Responses must not be compressed by middleware in order to work.
     implementation based on Starlette StreamingResponse
