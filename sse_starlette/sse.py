@@ -24,6 +24,10 @@ from starlette.types import Receive, Scope, Send
 _log = logging.getLogger(__name__)
 
 
+class SendTimeoutError(TimeoutError):
+    pass
+
+
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
     """helper for monkey-patching the signal-handler of uvicorn"""
@@ -171,6 +175,7 @@ class EventSourceResponse(Response):
         data_sender_callable: Optional[
             Callable[[], Coroutine[None, None, None]]
         ] = None,
+        send_timeout: Optional[float] = None,
     ) -> None:
         if sep is not None and sep not in ["\r\n", "\r", "\n"]:
             raise ValueError(f"sep must be one of: \\r\\n, \\r, \\n, got: {sep}")
@@ -187,6 +192,7 @@ class EventSourceResponse(Response):
         self.media_type = self.media_type if media_type is None else media_type
         self.background = background
         self.data_sender_callable = data_sender_callable
+        self.send_timeout = send_timeout
 
         _headers: dict[str, str] = {}
         if headers is not None:  # pragma: no cover
@@ -245,7 +251,13 @@ class EventSourceResponse(Response):
         async for data in self.body_iterator:
             chunk = ensure_bytes(data, self.sep)
             _log.debug(f"chunk: {chunk.decode()}")
-            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            with anyio.move_on_after(self.send_timeout) as timeout:
+                await send(
+                    {"type": "http.response.body", "body": chunk, "more_body": True}
+                )
+            if timeout.cancel_called:
+                await self.body_iterator.aclose()
+                raise SendTimeoutError()
 
         async with self._send_lock:
             self.active = False
