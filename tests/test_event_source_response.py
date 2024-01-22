@@ -7,6 +7,7 @@ import anyio
 import anyio.lowlevel
 import pytest
 from sse_starlette import EventSourceResponse
+from sse_starlette.sse import SendTimeoutError
 from starlette.testclient import TestClient
 
 _log = logging.getLogger(__name__)
@@ -128,6 +129,34 @@ async def test_ping_concurrency(reset_appstatus_event):
         response = EventSourceResponse(event_publisher(), ping=1)
 
         await response({}, receive, send)
+
+
+@pytest.mark.anyio
+async def test_send_timeout():
+    # Timeout is set to 0.5s, but `send` will take 1s. Expect SendTimeoutError.
+    cleanup = False
+
+    async def event_publisher():
+        try:
+            yield {"event": "some", "data": "any"}
+            assert False  # never reached
+        finally:
+            nonlocal cleanup
+            cleanup = True
+
+    async def send(*args, **kwargs):
+        await anyio.sleep(1.0)
+        # noinspection PyAsyncCall
+
+    async def receive():
+        await anyio.lowlevel.checkpoint()
+        return {"type": "something"}
+
+    with pytest.raises(SendTimeoutError):
+        response = EventSourceResponse(event_publisher(), send_timeout=0.5)
+        await response({}, receive, send)
+
+    assert cleanup
 
 
 def test_header_charset():
