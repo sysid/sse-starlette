@@ -6,9 +6,10 @@ from functools import partial
 import anyio
 import anyio.lowlevel
 import pytest
+from starlette.testclient import TestClient
+
 from sse_starlette import EventSourceResponse
 from sse_starlette.sse import SendTimeoutError
-from starlette.testclient import TestClient
 
 _log = logging.getLogger(__name__)
 
@@ -131,8 +132,20 @@ async def test_ping_concurrency(reset_appstatus_event):
         await response({}, receive, send)
 
 
+def test_header_charset():
+    async def numbers(minimum, maximum):
+        for i in range(minimum, maximum + 1):
+            await anyio.sleep(0.1)
+            yield i
+
+    generator = numbers(1, 5)
+    response = EventSourceResponse(generator, ping=0.2)  # type: ignore
+    content_type = [h for h in response.raw_headers if h[0].decode() == "content-type"]
+    assert content_type == [(b"content-type", b"text/event-stream; charset=utf-8")]
+
+
 @pytest.mark.anyio
-async def test_send_timeout():
+async def test_send_timeout(reset_appstatus_event):
     # Timeout is set to 0.5s, but `send` will take 1s. Expect SendTimeoutError.
     cleanup = False
 
@@ -146,7 +159,6 @@ async def test_send_timeout():
 
     async def send(*args, **kwargs):
         await anyio.sleep(1.0)
-        # noinspection PyAsyncCall
 
     async def receive():
         await anyio.lowlevel.checkpoint()
@@ -159,13 +171,3 @@ async def test_send_timeout():
     assert cleanup
 
 
-def test_header_charset():
-    async def numbers(minimum, maximum):
-        for i in range(minimum, maximum + 1):
-            await asyncio.sleep(0.1)
-            yield i
-
-    generator = numbers(1, 5)
-    response = EventSourceResponse(generator, ping=0.2)  # type: ignore
-    content_type = [h for h in response.raw_headers if h[0].decode() == "content-type"]
-    assert content_type == [(b"content-type", b"text/event-stream; charset=utf-8")]
