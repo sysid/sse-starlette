@@ -127,10 +127,9 @@ async def test_ping_concurrency(reset_appstatus_event):
         await anyio.lowlevel.checkpoint()
         return {"type": "something"}
 
+    response = EventSourceResponse(event_publisher(), ping=1)
     with pytest.raises(anyio.WouldBlock) as e:
         with collapse_excgroups():
-            response = EventSourceResponse(event_publisher(), ping=1)
-
             await response({}, receive, send)
 
 
@@ -163,7 +162,6 @@ async def test_send_timeout(reset_appstatus_event):
         await anyio.sleep(1.0)
 
     async def receive():
-        # await anyio.sleep(0)
         await anyio.lowlevel.checkpoint()
         return {"type": "something"}
 
