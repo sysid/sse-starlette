@@ -167,9 +167,9 @@ async def test_send_timeout(reset_appstatus_event):
         await anyio.lowlevel.checkpoint()
         return {"type": "something"}
 
+    response = EventSourceResponse(event_publisher(), send_timeout=0.5)
     with pytest.raises(SendTimeoutError):
         with collapse_excgroups():
-            response = EventSourceResponse(event_publisher(), send_timeout=0.5)
             await response({}, receive, send)
 
     assert cleanup
