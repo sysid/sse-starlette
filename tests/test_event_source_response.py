@@ -10,6 +10,7 @@ from starlette.testclient import TestClient
 
 from sse_starlette import EventSourceResponse
 from sse_starlette.sse import SendTimeoutError
+from tests.anyio_compat import collapse_excgroups
 
 _log = logging.getLogger(__name__)
 
@@ -127,9 +128,10 @@ async def test_ping_concurrency(reset_appstatus_event):
         return {"type": "something"}
 
     with pytest.raises(anyio.WouldBlock) as e:
-        response = EventSourceResponse(event_publisher(), ping=1)
+        with collapse_excgroups():
+            response = EventSourceResponse(event_publisher(), ping=1)
 
-        await response({}, receive, send)
+            await response({}, receive, send)
 
 
 def test_header_charset(reset_appstatus_event):
@@ -165,21 +167,10 @@ async def test_send_timeout(reset_appstatus_event):
         await anyio.lowlevel.checkpoint()
         return {"type": "something"}
 
-    # with pytest.raises(SendTimeoutError):
-    #     response = EventSourceResponse(event_publisher(), send_timeout=0.5)
-    #     await response({}, receive, send)
-    #
-    try:
-        response = EventSourceResponse(event_publisher(), send_timeout=0.5)
-        await response({}, receive, send)
-    except SendTimeoutError:
-        print(f"expected")
-        pass  # Expected exception
-    except asyncio.CancelledError:
-        print(f"cancelled")
-    except ExceptionGroup as e:
-        print(f"exception group: {e}")
-        assert isinstance(e.exceptions[0], SendTimeoutError)  # TODO: WIP
+    with pytest.raises(SendTimeoutError):
+        with collapse_excgroups():
+            response = EventSourceResponse(event_publisher(), send_timeout=0.5)
+            await response({}, receive, send)
 
     assert cleanup
 
