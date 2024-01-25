@@ -1,4 +1,4 @@
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 __all__ = ["ServerSentEvent", "EventSourceResponse"]
-__version__ = "1.8.3"
+__version__ = "2.0.0"
