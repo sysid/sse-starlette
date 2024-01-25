@@ -3,10 +3,11 @@ import asyncio
 import logging
 
 import uvicorn
-from sse_starlette import EventSourceResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Route
+
+from sse_starlette import EventSourceResponse
 
 """
 example by: justindujardin

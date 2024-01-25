@@ -84,6 +84,13 @@ async def handle():
         ping_message_factory=lambda: ServerSentEvent(**{"comment": "You can't see\r\nthis ping"}),
     )
 ```
+### SSE Send Timeout
+To avoid 'hanging' connections in case HTTP connection from a certain client was kept open, but the client
+stopped reading from the connection you can specifiy a send timeout (see
+[#89](https://github.com/sysid/sse-starlette/issues/89)).
+```python
+EventSourceResponse(..., send_timeout=5)  # terminate hanging send call after 5s
+```
 
 ### Fan out Proxies
 Fan out proxies usually rely on response being cacheable. To support that, you can set the value of `Cache-Control`.
@@ -96,7 +103,6 @@ return EventSourceResponse(
 ### Error Handling
 See example: `examples/error_handling.py`
 
-
 ### Sending Responses without Async Generators
 Async generators can expose tricky error and cleanup behavior especially when they are interrupted.
 
@@ -107,16 +113,16 @@ that does not rely on async generators but instead uses memory channels (`exampl
 
 
 ## Development, Contributing
-1. install pipenv: `pip install pipenv`
-2. install dependencies using pipenv: `pipenv install --dev -e .`
-3. To run tests, either:
-   - `pipenv run pytest`
- 
+1. install pdm: `pip install pdm`
+2. install dependencies using pipenv: `pdm install -d.`
+3. To run tests:
+
 ### Makefile
-- make sure your virtualenv is active: `pipenv shell`
+- make sure your virtualenv is active
 - check `Makefile` for available commands and development support, e.g. run the unit tests:
 ```python
 make test
+make tox
 ```
 
 For integration testing you can use the provided examples in `tests` and `examples`.

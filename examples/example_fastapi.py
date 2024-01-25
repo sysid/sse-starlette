@@ -3,8 +3,9 @@ import logging
 
 import uvicorn
 from fastapi import FastAPI
-from sse_starlette.sse import EventSourceResponse
 from starlette.requests import Request
+
+from sse_starlette.sse import EventSourceResponse
 
 _log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"

@@ -12,11 +12,11 @@ connections: lsof -i :8000
 buffers: netstat -m
 """
 import anyio
+import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Route
 
 from sse_starlette import EventSourceResponse
-import uvicorn
 
 
 async def events(request):
@@ -31,7 +31,9 @@ async def events(request):
                 await anyio.sleep(0.001)
         finally:
             print("disconnected")
+
     return EventSourceResponse(_event_generator(), send_timeout=10)
+
 
 app = Starlette(
     debug=True,

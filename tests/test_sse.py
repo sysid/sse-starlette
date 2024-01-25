@@ -1,4 +1,5 @@
 import pytest
+
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent, ensure_bytes
 
 

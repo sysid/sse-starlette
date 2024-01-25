@@ -2,8 +2,9 @@ import asyncio
 from typing import List
 
 from fastapi import Depends, FastAPI
-from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette import status
+
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
 """
 This example shows how to use multiple streams.

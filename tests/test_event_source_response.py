@@ -171,5 +171,3 @@ async def test_send_timeout(reset_appstatus_event):
             await response({}, receive, send)
 
     assert cleanup
-
-
