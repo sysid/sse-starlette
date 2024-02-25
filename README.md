@@ -1,5 +1,6 @@
 # Server Sent Events for [Starlette](https://github.com/encode/starlette) and [FastAPI](https://fastapi.tiangolo.com/)
 
+[![Downloads](https://static.pepy.tech/badge/sse-starlette/week)](https://pepy.tech/project/sse-starlette)
 [![PyPI Version][pypi-image]][pypi-url]
 [![Build Status][build-image]][build-url]
 [![Code Coverage][coverage-image]][coverage-url]

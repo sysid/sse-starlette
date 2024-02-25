@@ -44,7 +44,7 @@ tag = false
 message = "Bump version to {new_version}"
 
 [tool.bumpversion.file_patterns]
-"sset_starlette/__init__.py" = [
+"sse_starlette/__init__.py" = [
     {search = "__version__ = '{current_version}'", replace = "__version__ = '{new_version}'"},
 ]
 "VERSION" = [

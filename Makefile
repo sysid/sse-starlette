@@ -6,8 +6,7 @@ BUILDDIR      = build
 MAKE          = make
 VERSION       = $(shell cat VERSION)
 
-app_root = $(PROJ_DIR)
-app_root ?= .
+app_root := $(if $(PROJ_DIR),$(PROJ_DIR),$(CURDIR))
 pkg_src =  $(app_root)/sse_starlette
 tests_src = $(app_root)/tests
 
