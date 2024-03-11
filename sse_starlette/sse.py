@@ -1,7 +1,7 @@
 import io
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import partial
 from typing import (
     Any,
@@ -316,7 +316,9 @@ class EventSourceResponse(Response):
             if self.ping_message_factory:
                 assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
-                ServerSentEvent(comment=f"ping - {datetime.utcnow()}").encode()
+                ServerSentEvent(
+                    comment=f"ping - {datetime.now(timezone.utc)}", sep=self.sep
+                ).encode()
                 if self.ping_message_factory is None
                 else ensure_bytes(self.ping_message_factory(), self.sep)
             )
