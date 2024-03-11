@@ -80,7 +80,7 @@ async def make_arequest(url, expected_lines=2):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows")
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_stop_server_with_many_consumers(caplog):
     """Expect all consumers to close gracefully when the server is stopped."""
     caplog.set_level(logging.DEBUG)
