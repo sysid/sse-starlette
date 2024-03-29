@@ -124,6 +124,7 @@ async def make_arequest(url, expected_lines=2):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows")
+@pytest.mark.e2e
 @pytest.mark.parametrize(
     ("server_command", "expected_lines"),
     [
