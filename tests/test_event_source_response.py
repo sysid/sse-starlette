@@ -98,7 +98,7 @@ async def test_disconnect_from_client(httpx_client, caplog):
             finally:
                 # The cancel_called property will be True if timeout was reached
                 assert scope.cancel_called is True
-                assert "chunk: data: 4" in caplog.text
+                assert "chunk: b'data: 4\\r\\n\\r\\n'" in caplog.text
                 assert "Disconnected from client" in caplog.text
 
 
