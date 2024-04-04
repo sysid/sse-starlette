@@ -250,7 +250,7 @@ class EventSourceResponse(Response):
         )
         async for data in self.body_iterator:
             chunk = ensure_bytes(data, self.sep)
-            _log.debug(f"chunk: {chunk.decode()}")
+            _log.debug("chunk: %s", chunk)
             with anyio.move_on_after(self.send_timeout) as timeout:
                 await send(
                     {"type": "http.response.body", "body": chunk, "more_body": True}
@@ -322,7 +322,7 @@ class EventSourceResponse(Response):
                 if self.ping_message_factory is None
                 else ensure_bytes(self.ping_message_factory(), self.sep)
             )
-            _log.debug(f"ping: {ping.decode()}")
+            _log.debug("ping: %s", ping)
             async with self._send_lock:
                 if self.active:
                     await send(
