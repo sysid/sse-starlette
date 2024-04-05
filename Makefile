@@ -70,6 +70,10 @@ TESTING:  ## ############################################################
 test:  ## run tests
 	python -m pytest -ra --junitxml=report.xml --cov-config=pyproject.toml --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
 
+.PHONY: test-unit
+test-unit:  ## run all tests except "integration" marked
+	RUN_ENV=local python -m pytest -m "not (integration or e2e)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+
 .PHONY: tox
 tox:   ## Run tox
 	tox

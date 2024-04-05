@@ -256,7 +256,8 @@ class EventSourceResponse(Response):
                     {"type": "http.response.body", "body": chunk, "more_body": True}
                 )
             if timeout.cancel_called:
-                await self.body_iterator.aclose()
+                if hasattr(self.body_iterator, "aclose"):
+                    await self.body_iterator.aclose()
                 raise SendTimeoutError()
 
         async with self._send_lock:

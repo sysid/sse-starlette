@@ -4,6 +4,7 @@ import logging
 
 from starlette.applications import Starlette
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from sse_starlette import EventSourceResponse
@@ -29,6 +30,18 @@ async def endless(req: Request):
     return EventSourceResponse(event_publisher())
 
 
+async def healthcheck(req: Request):
+    return JSONResponse({"status": "ok"})
+
+
 app = Starlette(
-    routes=[Route("/endless", endpoint=endless)],
+    routes=[
+        Route("/endless", endpoint=endless),
+        Route("/health", endpoint=healthcheck),
+    ],
 )
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="localhost", port=8001, log_level="trace")

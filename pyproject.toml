@@ -37,6 +37,14 @@ Source = "https://github.com/sysid/sse-starlette"
 [project.optional-dependencies]
 examples = ["fastapi"]
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests",
+    "e2e: marks tests as e2e tests, not to be run in CICD"
+]
+asyncio_mode = "auto"
+#addopts = "--cov=my_package --cov-report=term-missing"
+
 [tool.bumpversion]
 current_version = "2.0.0"
 commit = true
@@ -89,12 +97,6 @@ dev = [
     "psutil",
     "black>=23.11.0",
 ]
-[tool.pytest.ini_options]
-markers = [
-    "integration: marks tests as integration tests",
-]
-asyncio_mode = "auto"
-#addopts = "--cov=my_package --cov-report=term-missing"
 
 [tool.isort]
 multi_line_output = 3
