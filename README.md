@@ -121,7 +121,7 @@ that does not rely on async generators but instead uses memory channels (`exampl
 ### Makefile
 - make sure your virtualenv is active
 - check `Makefile` for available commands and development support, e.g. run the unit tests:
-```python
+```shell
 make test
 make tox
 ```
