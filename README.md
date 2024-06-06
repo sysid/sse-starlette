@@ -115,7 +115,7 @@ that does not rely on async generators but instead uses memory channels (`exampl
 
 ## Development, Contributing
 1. install pdm: `pip install pdm`
-2. install dependencies using pipenv: `pdm install -d.`
+2. install dependencies using pipenv: `pdm install -d`.
 3. To run tests:
 
 ### Makefile
