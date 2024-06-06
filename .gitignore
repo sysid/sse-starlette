@@ -13,3 +13,4 @@ __pycache__/
 venv/
 Pipfile.lock
 .envrc
+.pdm-python
