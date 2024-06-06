@@ -155,10 +155,9 @@ def test_stop_server_with_many_consumers(caplog, server_command, expected_lines)
     if server_process is None or server_process.poll() is not None:
         pytest.fail("Server did not start.")
 
-    # Initialize asyncio loops and threads
-    loops = [asyncio.new_event_loop() for _ in range(N_CONSUMER)]
+    # Initialize threads
     threads = []
-    for loop in loops:
+    for _ in range(N_CONSUMER):
         thread = threading.Thread(
             target=lambda: asyncio.run(
                 make_arequest(f"{URL}:{port}/endless", expected_lines=expected_lines)
