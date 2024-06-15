@@ -13,6 +13,8 @@ _log = logging.getLogger(__name__)
 
 
 async def endless(req: Request):
+    """Simulates an endless stream, events sent every 0.3 seconds"""
+
     async def event_publisher():
         i = 0
         try:
@@ -23,7 +25,9 @@ async def endless(req: Request):
                 yield dict(data=i)
                 await asyncio.sleep(0.3)
         except asyncio.CancelledError as e:
-            _log.info(f"Disconnected from client (via refresh/close) {req.client}")
+            _log.info(
+                f"Disconnected from client (via refresh/close) {req.client} after {i} events"
+            )
             # Do any other cleanup, if any
             raise e
 

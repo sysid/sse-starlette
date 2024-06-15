@@ -72,7 +72,15 @@ def terminate_server():
             for child in parent.children(recursive=True):
                 child.terminate()
             parent.terminate()
-            parent.wait()
+            try:
+                # fix uvicorn breaking change: https://github.com/encode/uvicorn/compare/0.28.1...0.29.0
+                parent.wait(timeout=1)
+            except psutil.TimeoutExpired:
+                _log.info(
+                    "Server process did not terminate after 1 second, killing it."
+                )
+                parent.kill()
+                parent.wait()
             server_process.wait()
             _log.debug("Server process terminated.")
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -109,7 +117,9 @@ async def make_arequest(url, expected_lines=2):
         finally:
             assert (
                 i == expected_lines
-            ), f"Expected {expected_lines} lines"  # not part of test runner, failure is not reported
+            ), (
+                f"Expected {expected_lines} lines"
+            )  # not part of test runner, failure is not reported
 
         _log.info(
             f"{threading.current_thread().ident}: Stopping making requests to {url=}, finished after {i=} responses."
@@ -120,7 +130,9 @@ async def make_arequest(url, expected_lines=2):
         # ...
         assert (
             i == expected_lines
-        ), f"Expected {expected_lines} lines"  # not part of test runner, failure is not reported
+        ), (
+            f"Expected {expected_lines} lines"
+        )  # not part of test runner, failure is not reported
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows")
@@ -130,7 +142,7 @@ async def make_arequest(url, expected_lines=2):
     [
         (
             "uvicorn tests.integration.main_endless:app --host localhost --port {port} --log-level {log_level}",
-            8,
+            14,
         ),
         (
             "uvicorn tests.integration.main_endless_conditional:app --host localhost --port {port} --log-level {log_level}",

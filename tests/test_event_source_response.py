@@ -128,7 +128,7 @@ async def test_ping_concurrency(reset_appstatus_event):
         return {"type": "something"}
 
     response = EventSourceResponse(event_publisher(), ping=1)
-    with pytest.raises(anyio.WouldBlock) as e:
+    with pytest.raises(anyio.WouldBlock):
         with collapse_excgroups():
             await response({}, receive, send)
 

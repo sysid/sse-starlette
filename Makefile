@@ -83,28 +83,29 @@ tox:   ## Run tox
 ################################################################################
 # Code Quality \
 QUALITY:  ## ############################################################
-.PHONY: style
-style: isort format  ## perform code style format (black, isort)
 
 .PHONY: format
-format:  ## perform black formatting
-	black $(pkg_src) tests
+format:  ## perform ruff formatting
+	@ruff format $(pkg_src) $(tests_src)
 
-.PHONY: isort
-isort:  ## apply import sort ordering
-	isort . --profile black
+.PHONY: format-check
+format-check:  ## perform black formatting
+	@ruff format --check $(pkg_src) $(tests_src)
+
+.PHONY: sort-imports
+sort-imports:  ## apply import sort ordering
+	isort $(pkg_src) $(tests_src) --profile black
+
+.PHONY: style
+style: sort-imports format  ## perform code style format (black, isort)
 
 .PHONY: lint
-lint: flake8 mypy ## lint code with all static code checks
-
-.PHONY: flake8
-flake8:  ## check style with flake8
-	@flake8 $(pkg_src)
+lint:  ## check style with ruff
+	ruff $(pkg_src) $(tests_src)
 
 .PHONY: mypy
 mypy:  ## check type hint annotations
-	# keep config in pyproject.toml for integration with PyCharm
-	mypy --config-file pyproject.toml $(pkg_src)
+	@mypy --config-file pyproject.toml --install-types --non-interactive $(pkg_src)
 
 ################################################################################
 # Clean \
