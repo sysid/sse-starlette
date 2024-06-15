@@ -28,11 +28,11 @@ build: clean format sort-imports  ## format and build
 .PHONY: publish
 publish:  ## publish
 	@echo "upload to Pypi"
-	pdm publish
 	#twine upload --verbose dist/*
 	#@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep main | grep Bump && \
 		#twine upload --verbose dist/* || \
 		#echo "Bump Version before trying to upload"
+	pdm publish
 
 .PHONY: bump-major
 bump-major:  ## bump-major, tag and push

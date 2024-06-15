@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "sse-starlette"
-version = "2.1.1"
+version = "2.1.2"
 description = "SSE plugin for Starlette"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
@@ -46,7 +46,7 @@ asyncio_mode = "auto"
 #addopts = "--cov=my_package --cov-report=term-missing"
 
 [tool.bumpversion]
-current_version = "2.1.1"
+current_version = "2.1.2"
 commit = true
 tag = false
 message = "Bump version to {new_version}"
