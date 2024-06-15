@@ -143,7 +143,9 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> by
         return ServerSentEvent(str(data), sep=sep).encode()
 
 
-Content = Union[str, bytes, dict, ServerSentEvent]
+Content = Union[
+    str, bytes, dict, ServerSentEvent, Any
+]  # https://github.com/sysid/sse-starlette/issues/101#issue-2340755790
 SyncContentStream = Iterator[Content]
 AsyncContentStream = AsyncIterable[Content]
 ContentStream = Union[AsyncContentStream, SyncContentStream]
