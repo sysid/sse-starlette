@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "starlette",
-    "uvicorn",
+    "uvicorn==0.28.1",  # 0.29 breaks testing
     "anyio",
 ]
 [project.urls]
