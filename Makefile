@@ -20,14 +20,14 @@ all: clean build upload  ## Build and upload
 # Building, Deploying \
 BUILDING:  ## ############################################################
 .PHONY: build
-build: clean format isort  ## format and build
+build: clean format sort-imports  ## format and build
 	@echo "building"
 	#python -m build
 	pdm build
 
-.PHONY: upload
-upload:  ## upload to PyPi
-	@echo "upload"
+.PHONY: publish
+publish:  ## publish
+	@echo "upload to Pypi"
 	pdm publish
 	#twine upload --verbose dist/*
 	#@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep main | grep Bump && \
