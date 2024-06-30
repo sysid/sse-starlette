@@ -1,3 +1,4 @@
+import contextvars
 import io
 import logging
 import re
@@ -20,6 +21,9 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
+
+# https://github.com/sysid/sse-starlette/issues/103
+from starlette_context import context
 
 _log = logging.getLogger(__name__)
 
@@ -160,6 +164,7 @@ class EventSourceResponse(Response):
     """
 
     body_iterator: AsyncContentStream
+    current_context = None
 
     DEFAULT_PING_INTERVAL = 15
 
@@ -217,6 +222,9 @@ class EventSourceResponse(Response):
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
         self._send_lock = anyio.Lock()
 
+        # Capture the context data
+        self.current_context = context.data
+
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:
         while True:
@@ -243,6 +251,9 @@ class EventSourceResponse(Response):
         await AppStatus.should_exit_event.wait()
 
     async def stream_response(self, send: Send) -> None:
+        context_var = contextvars.ContextVar("context")
+        context_var.set(self.current_context)
+
         await send(
             {
                 "type": "http.response.start",
