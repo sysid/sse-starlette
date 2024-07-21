@@ -96,6 +96,7 @@ dev = [
     "asgi-lifespan",
     "psutil",
     "black>=23.11.0",
+    "ruff",
 ]
 
 [tool.isort]

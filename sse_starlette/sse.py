@@ -20,6 +20,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
 
 _log = logging.getLogger(__name__)
 
@@ -196,14 +197,18 @@ class EventSourceResponse(Response):
         self.data_sender_callable = data_sender_callable
         self.send_timeout = send_timeout
 
-        _headers: dict[str, str] = {}
+        _headers = MutableHeaders()
         if headers is not None:  # pragma: no cover
             _headers.update(headers)
 
-        # mandatory for servers-sent events headers
+        # "The no-store response directive indicates that any caches of any kind (private or shared)
+        # should not store this response."
+        # -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
         # allow cache control header to be set by user to support fan out proxies
         # https://www.fastly.com/blog/server-sent-events-fastly
-        _headers.setdefault("Cache-Control", "no-cache")
+
+        _headers.setdefault("Cache-Control", "no-store")
+        # mandatory for servers-sent events headers
         _headers["Connection"] = "keep-alive"
         _headers["X-Accel-Buffering"] = "no"
 

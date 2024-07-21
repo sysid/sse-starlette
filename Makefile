@@ -101,7 +101,7 @@ style: sort-imports format  ## perform code style format (black, isort)
 
 .PHONY: lint
 lint:  ## check style with ruff
-	ruff $(pkg_src) $(tests_src)
+	ruff check $(pkg_src) $(tests_src)
 
 .PHONY: mypy
 mypy:  ## check type hint annotations
