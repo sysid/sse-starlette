@@ -171,3 +171,36 @@ async def test_send_timeout(reset_appstatus_event):
             await response({}, receive, send)
 
     assert cleanup
+
+
+def test_headers_with_override():
+    generator = range(1, 10)
+    response = EventSourceResponse(generator, ping=0.2)  # type: ignore
+    default_headers = dict((h.decode(), v.decode()) for h, v in response.raw_headers)
+    assert default_headers == {
+        "cache-control": "no-store",
+        "x-accel-buffering": "no",
+        "connection": "keep-alive",
+        "content-type": "text/event-stream; charset=utf-8",
+    }
+
+    custom_headers = {
+        # cache-control can be overridden
+        "cache-control": "no-cache",
+        # x-accel-buffering and connection cannot
+        "x-accel-buffering": "yes",
+        "connection": "close",
+        # other headers are allowed
+        "x-my-special-header": "37",
+    }
+    generator = range(1, 10)
+    response = EventSourceResponse(generator, headers=custom_headers, ping=0.2)  # type: ignore
+    override_headers = dict((h.decode(), v.decode()) for h, v in response.raw_headers)
+
+    assert override_headers == {
+        "cache-control": "no-cache",
+        "x-accel-buffering": "no",
+        "connection": "keep-alive",
+        "x-my-special-header": "37",
+        "content-type": "text/event-stream; charset=utf-8",
+    }
