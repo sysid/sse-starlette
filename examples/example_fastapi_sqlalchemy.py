@@ -26,6 +26,8 @@ WITH todo AS (
     UNION ALL
     SELECT 3, 'Task 3', 'Description 3', 0
 )
+
+SELECT * FROM todo
 """
 
 # App
