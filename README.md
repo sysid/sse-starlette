@@ -86,7 +86,7 @@ async def bad_route():
             async for row in session.execute(select(User)):
                 yield dict(data=row)
 
-        return EventSourceResponse(generator)
+    return EventSourceResponse(generator)
 ```
 
 Instead, ensure you create sessions within the generator itself
