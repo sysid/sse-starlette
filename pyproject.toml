@@ -31,6 +31,8 @@ dependencies = [
     "uvicorn",
     "anyio",
 ]
+homepage = "https://github.com/sysid/sse-starlette"
+
 [project.urls]
 Source = "https://github.com/sysid/sse-starlette"
 
