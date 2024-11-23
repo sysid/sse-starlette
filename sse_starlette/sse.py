@@ -1,40 +1,38 @@
 import io
 import logging
 import re
-from datetime import datetime, timezone
-from functools import partial
+import asyncio
+
+from datetime import datetime
 from typing import (
     Any,
     AsyncIterable,
-    Awaitable,
     Callable,
     Coroutine,
     Iterator,
     Mapping,
-    Optional,
-    Union,
+    Union,    
 )
 
-import anyio
-from starlette.background import BackgroundTask
-from starlette.concurrency import iterate_in_threadpool
+from starlette.background import BackgroundTask,BackgroundTasks
+from starlette.concurrency import iterate_in_threadpool,run_in_threadpool
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 from starlette.datastructures import MutableHeaders
+from starlette._utils import is_async_callable
 
-_log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+#logger.disabled = True
 
-
-class SendTimeoutError(TimeoutError):
-    pass
-
+# most times, we may need other logs but not ping log every 10-15s
+DEBUG_PING = False
 
 # https://stackoverflow.com/questions/58133694/graceful-shutdown-of-uvicorn-starlette-app-with-websockets
 class AppStatus:
     """helper for monkey-patching the signal-handler of uvicorn"""
 
     should_exit = False
-    should_exit_event: Union[anyio.Event, None] = None
+    should_exit_event: Union[asyncio.Event, None] = None
 
     @staticmethod
     def handle_exit(*args, **kwargs):
@@ -59,19 +57,19 @@ try:
         Server.handle_exit = original_handler
 
 except ModuleNotFoundError:
-    _log.debug("Uvicorn not used.")
+    logger.warning("Uvicorn not used.")
 
 
 class ServerSentEvent:
     def __init__(
         self,
-        data: Optional[Any] = None,
+        data: Any = None,
         *,
-        event: Optional[str] = None,
-        id: Optional[str] = None,
-        retry: Optional[int] = None,
-        comment: Optional[str] = None,
-        sep: Optional[str] = None,
+        event: str = None,
+        id: int | str = None,
+        retry: int = None,
+        comment: str = None,
+        sep: str = None,
     ) -> None:
         """Send data using EventSource protocol
 
@@ -144,9 +142,8 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> by
         return ServerSentEvent(str(data), sep=sep).encode()
 
 
-Content = Union[
-    str, bytes, dict, ServerSentEvent, Any
-]  # https://github.com/sysid/sse-starlette/issues/101#issue-2340755790
+Content = Union[str, bytes, dict, ServerSentEvent, Any]
+# https://github.com/sysid/sse-starlette/issues/101#issue-2340755790
 SyncContentStream = Iterator[Content]
 AsyncContentStream = AsyncIterable[Content]
 ContentStream = Union[AsyncContentStream, SyncContentStream]
@@ -169,17 +166,15 @@ class EventSourceResponse(Response):
         self,
         content: ContentStream,
         status_code: int = 200,
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] = None,
         media_type: str = "text/event-stream",
-        background: Optional[BackgroundTask] = None,
-        ping: Optional[int] = None,
-        sep: Optional[str] = None,
-        ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
-        data_sender_callable: Optional[
-            Callable[[], Coroutine[None, None, None]]
-        ] = None,
-        send_timeout: Optional[float] = None,
-    ) -> None:
+        on_close: Callable[[], Any | Coroutine[None, None, None]]= None,
+        ping: int | float = None,
+        sep: str = None,
+        ping_message_factory: Callable[[], ServerSentEvent] = None,
+        on_open: Callable[[], Coroutine[None, None, None]]= None,
+        send_timeout: float = None,        
+    ) -> None:        
         if sep is not None and sep not in ["\r\n", "\r", "\n"]:
             raise ValueError(f"sep must be one of: \\r\\n, \\r, \\n, got: {sep}")
         self.DEFAULT_SEPARATOR = "\r\n"
@@ -193,10 +188,11 @@ class EventSourceResponse(Response):
             self.body_iterator = iterate_in_threadpool(content)
         self.status_code = status_code
         self.media_type = self.media_type if media_type is None else media_type
-        self.background = background
-        self.data_sender_callable = data_sender_callable
-        self.send_timeout = send_timeout
-
+        self.background = None # since never called super().__init__(e.t.:Response.__init__), this field(background) must be built manualy, FastApi use this field to run BackgroundTasks.
+        self.on_close = on_close        
+        self.on_open = on_open
+        self.send_timeout = send_timeout                
+        
         _headers = MutableHeaders()
         if headers is not None:  # pragma: no cover
             _headers.update(headers)
@@ -204,30 +200,29 @@ class EventSourceResponse(Response):
         # "The no-store response directive indicates that any caches of any kind (private or shared)
         # should not store this response."
         # -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
+
         # allow cache control header to be set by user to support fan out proxies
         # https://www.fastly.com/blog/server-sent-events-fastly
-
         _headers.setdefault("Cache-Control", "no-store")
-        # mandatory for servers-sent events headers
         _headers["Connection"] = "keep-alive"
         _headers["X-Accel-Buffering"] = "no"
 
         self.init_headers(_headers)
 
-        self.ping_interval = self.DEFAULT_PING_INTERVAL if ping is None else ping
+        self.ping_interval = ping or self.DEFAULT_PING_INTERVAL
         self.active = True
 
         self._ping_task = None
 
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
-        self._send_lock = anyio.Lock()
+        self._send_lock = asyncio.Lock()
 
     @staticmethod
     async def listen_for_disconnect(receive: Receive) -> None:
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
-                _log.debug("Got event: http.disconnect. Stop streaming.")
+                logger.debug("Got event: http.disconnect. Stop streaming.")
                 break
 
     @staticmethod
@@ -238,7 +233,7 @@ class EventSourceResponse(Response):
 
         # Setup an Event
         if AppStatus.should_exit_event is None:
-            AppStatus.should_exit_event = anyio.Event()
+            AppStatus.should_exit_event = asyncio.Event()
 
         # Check if should_exit got set while we set up the event
         if AppStatus.should_exit:
@@ -255,41 +250,45 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
-        async for data in self.body_iterator:
+        async for data in self.body_iterator:            
             chunk = ensure_bytes(data, self.sep)
-            _log.debug("chunk: %s", chunk)
-            with anyio.move_on_after(self.send_timeout) as timeout:
-                await send(
-                    {"type": "http.response.body", "body": chunk, "more_body": True}
-                )
-            if timeout.cancel_called:
+            logger.debug(f"stream asend: {chunk.decode()}")
+            try:
+                async with asyncio.timeout(self.send_timeout) as timeout:
+                    await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            except asyncio.TimeoutError:
                 if hasattr(self.body_iterator, "aclose"):
                     await self.body_iterator.aclose()
-                raise SendTimeoutError()
 
         async with self._send_lock:
             self.active = False
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async with anyio.create_task_group() as task_group:
-            # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
-            async def wrap(func: Callable[[], Awaitable[None]]) -> None:
-                await func()
-                # noinspection PyAsyncCall
-                task_group.cancel_scope.cancel()
-
-            task_group.start_soon(wrap, partial(self.stream_response, send))
-            task_group.start_soon(wrap, partial(self._ping, send))
-            task_group.start_soon(wrap, self.listen_for_exit_signal)
-
-            if self.data_sender_callable:
-                task_group.start_soon(self.data_sender_callable)
-
-            await wrap(partial(self.listen_for_disconnect, receive))
-
-        if self.background is not None:  # pragma: no cover, tested in StreamResponse
-            await self.background()
+        
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(self.stream_response(send),name="sse_stream_response")
+            tg.create_task(self._ping(send),name="sse_ping")
+            
+            if self.on_open:
+                tg.create_task(self.on_open(),name='sse_on_open_callable')
+            
+            tg.create_task(self.listen_for_exit_signal(),name="sse_listen_for_exit_signal")
+            tg.create_task(self.listen_for_disconnect(receive),name="sse_listen_for_disconnect").add_done_callback(lambda ctx: tg._abort())
+                                                
+        # clear up
+        """ if self.on_close:
+            await self.on_close() """
+        
+        # the below is actually a simplified implement of BackgourndTask, ONLY difference is: args and kwargs have both been removed.
+        # for in this case, we actually don't need pass params in SSE code block. 
+        # I always felt that it is not a very good idea to call BackgroundTask directly, FastApi didn't import BackgroundTask, the author has a good reason.
+        if self.on_close:
+            if is_async_callable(self.on_close):
+                await self.on_close()
+            else:
+                await run_in_threadpool(self.on_close)
+                
 
     def enable_compression(self, force: bool = False) -> None:
         raise NotImplementedError
@@ -307,9 +306,9 @@ class EventSourceResponse(Response):
         """
 
         if not isinstance(value, (int, float)):
-            raise TypeError("ping interval must be int")
-        if value < 0:
-            raise ValueError("ping interval must be greater then 0")
+            raise TypeError("ping interval must be int or float")
+        if value <= 0:
+            raise ValueError("ping interval must be greater than 0")
 
         self._ping_interval = value
 
@@ -320,17 +319,18 @@ class EventSourceResponse(Response):
         # Alternatively one can send periodically a comment line
         # (one starting with a ':' character)
         while self.active:
-            await anyio.sleep(self._ping_interval)
+            await asyncio.sleep(self._ping_interval)
             if self.ping_message_factory:
                 assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
             ping = (
-                ServerSentEvent(
-                    comment=f"ping - {datetime.now(timezone.utc)}", sep=self.sep
-                ).encode()
+                ServerSentEvent(comment = f"⛨ ping {datetime.now()}", sep=self.sep).encode()
                 if self.ping_message_factory is None
                 else ensure_bytes(self.ping_message_factory(), self.sep)
             )
-            _log.debug("ping: %s", ping)
+            
+            if DEBUG_PING:
+                logger.debug(f"ping {ping.decode()}")
+                
             async with self._send_lock:
                 if self.active:
                     await send(
