@@ -13,3 +13,8 @@ updates:
     commit-message:
       prefix: ":arrow_up:"
     open-pull-requests-limit: 5
+    
+  - package-ecosystem: "github-actions" 
+    directory: "/"
+    schedule:
+      interval: "monthly"
