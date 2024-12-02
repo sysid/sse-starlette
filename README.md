@@ -145,6 +145,26 @@ Async generators can expose tricky error and cleanup behavior especially when th
 Example [`no_async_generators.py`](https://github.com/sysid/sse-starlette/pull/56#issue-1704495339) shows an alternative implementation
 that does not rely on async generators but instead uses memory channels (`examples/no_async_generators.py`).
 
+### Using pytest to test SSE Endpoints
+When testing more than a single SSE endpoint via pytest, one may encounter the following error: `RuntimeError: <asyncio.locks.Event object at 0xxxx [unset]> is bound to a different event loop`.
+
+A workaround to fix this error is to use the following fixture on all tests that use SSE:
+
+```python
+@pytest.fixture
+def reset_sse_starlette_appstatus_event():
+    """
+    Fixture that resets the appstatus event in the sse_starlette app.
+
+    Should be used on any test that uses sse_starlette to stream events.
+    """
+    # See https://github.com/sysid/sse-starlette/issues/59
+    from sse_starlette.sse import AppStatus
+
+    AppStatus.should_exit_event = None
+```
+
+For details, see [Issue#59](https://github.com/sysid/sse-starlette/issues/59#issuecomment-1961678665).
 
 ## Development, Contributing
 1. install pdm: `pip install pdm`
