@@ -16,6 +16,11 @@ all: clean build upload  ## Build and upload
 	@echo "-M- building and distributing"
 	@echo "--------------------------------------------------------------------------------"
 
+build-docker: ## build docker image
+	@echo "building docker image"
+	docker build --platform linux/amd64 --progress=plain -t sse_starlette .
+	#docker tag $(IMAGE_NAME) 339712820866.dkr.ecr.eu-central-1.amazonaws.com/ticketron/backend:latest
+
 ################################################################################
 # Building, Deploying \
 BUILDING:  ## ############################################################
@@ -70,11 +75,12 @@ create-release:  ## create a release on GitHub via the gh cli
 TESTING:  ## ############################################################
 .PHONY: test
 test:  ## run tests
-	python -m pytest -ra --junitxml=report.xml --cov-config=pyproject.toml --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
+	#python -m pytest -ra --junitxml=report.xml --cov-config=pyproject.toml --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
+	RUN_ENV=local python -m pytest -m "not (experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
 
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
-	RUN_ENV=local python -m pytest -m "not (integration or e2e)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	RUN_ENV=local python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
 
 .PHONY: tox
 tox:   ## Run tox

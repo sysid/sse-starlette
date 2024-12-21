@@ -20,6 +20,8 @@ logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
 
 logging.getLogger("httpx").setLevel(logging.INFO)
 logging.getLogger("httpcore").setLevel(logging.INFO)
+logging.getLogger("urllib3").setLevel(logging.INFO)
+logging.getLogger("docker").setLevel(logging.INFO)
 
 
 @pytest.fixture

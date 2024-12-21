@@ -43,7 +43,7 @@ examples = ["fastapi"]
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests",
-    "e2e: marks tests as e2e tests, not to be run in CICD"
+    "experimentation: marks tests as experimental tests, not to be run in CICD"
 ]
 asyncio_mode = "auto"
 #addopts = "--cov=my_package --cov-report=term-missing"
@@ -100,6 +100,10 @@ dev = [
     "psutil",
     "black>=23.11.0",
     "ruff",
+    "async-timeout>=5.0.1",
+    "tenacity>=9.0.0",
+    "portend>=3.2.0",
+    "testcontainers>=3.7.1",
 ]
 
 [tool.isort]

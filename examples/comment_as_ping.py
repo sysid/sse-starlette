@@ -3,7 +3,8 @@ import asyncio
 from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from sse_starlette.sse import EventSourceResponse, ServerSentEvent
+from sse_starlette.sse import EventSourceResponse
+from sse_starlette import ServerSentEvent
 
 """
 This examples demonstrates how to use a comment as a ping instead of sending
