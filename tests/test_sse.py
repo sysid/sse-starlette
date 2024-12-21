@@ -38,7 +38,6 @@ def mock_memory_channels():
 
 
 class TestEventSourceResponse:
-
     @pytest.mark.parametrize(
         "input_type,separator,expected_output",
         [
@@ -46,10 +45,15 @@ class TestEventSourceResponse:
             ("dict_simple", "\r\n", b"data: 1\r\n\r\n"),
             ("dict_with_event", "\r\n", b"event: message\r\ndata: 1\r\n\r\n"),
             ("dict_with_event", "\r", b"event: message\rdata: 1\r\r"),
-        ]
+        ],
     )
     async def test_response_send_whenValidInput_thenGeneratesExpectedOutput(
-        self, reset_appstatus_event, mock_generator, input_type, separator, expected_output
+        self,
+        reset_appstatus_event,
+        mock_generator,
+        input_type,
+        separator,
+        expected_output,
     ):
         # Arrange
         async def app(scope, receive, send):
@@ -86,7 +90,7 @@ class TestEventSourceResponse:
             ("simple_dict", b"data: 1\r\n\r\n"),
             # Test dict with both event and data fields
             ("event_dict", b"event: message\r\ndata: 1\r\n\r\n"),
-        ]
+        ],
     )
     def test_eventSourceResponse_whenUsingMemoryChannel_thenHandlesAsyncQueueCorrectly(
         self, reset_appstatus_event, producer_output, expected_sse_response
@@ -106,7 +110,9 @@ class TestEventSourceResponse:
         # Arrange
         async def app(scope, receive, send):
             # Create bounded memory channel for producer-consumer communication
-            send_chan, recv_chan = anyio.create_memory_object_stream(max_buffer_size=math.inf)
+            send_chan, recv_chan = anyio.create_memory_object_stream(
+                max_buffer_size=math.inf
+            )
 
             # Producer function that writes to the channel
             async def stream_numbers(producer_channel, start, end):
@@ -128,8 +134,10 @@ class TestEventSourceResponse:
             # Create SSE response that consumes from channel
             response = EventSourceResponse(
                 recv_chan,  # Consumer reads from receive channel
-                data_sender_callable=partial(stream_numbers, send_chan, 1, 5),  # Producer writes to send channel
-                ping=0.2
+                data_sender_callable=partial(
+                    stream_numbers, send_chan, 1, 5
+                ),  # Producer writes to send channel
+                ping=0.2,
             )
             await response(scope, receive, send)
 
@@ -198,7 +206,7 @@ class TestEventSourceResponse:
             "cache-control": "no-cache",
             "x-accel-buffering": "yes",  # Should not override
             "connection": "close",  # Should not override
-            "x-custom-header": "custom-value"
+            "x-custom-header": "custom-value",
         }
 
         # Act
@@ -212,7 +220,9 @@ class TestEventSourceResponse:
         assert headers["x-custom-header"] == "custom-value"
         assert headers["content-type"] == "text/event-stream; charset=utf-8"
 
-    def test_headers_whenCreated_thenHasCorrectCharset(self, reset_appstatus_event, mock_generator):
+    def test_headers_whenCreated_thenHasCorrectCharset(
+        self, reset_appstatus_event, mock_generator
+    ):
         # Arrange
         generator = mock_generator(1, 5)
 
@@ -318,7 +328,9 @@ class TestEventSourceResponse:
         result = response.encode()
 
         # Assert
-        expected = f"event: {test_event}{separator}data: {test_data}{separator}{separator}"
+        expected = (
+            f"event: {test_event}{separator}data: {test_data}{separator}{separator}"
+        )
         assert result == expected.encode()
 
     @pytest.mark.anyio
@@ -339,10 +351,7 @@ class TestEventSourceResponse:
             await anyio.lowlevel.checkpoint()
             return {"type": "http.disconnect"}
 
-        response = EventSourceResponse(
-            [],
-            background=BackgroundTask(background_task)
-        )
+        response = EventSourceResponse([], background=BackgroundTask(background_task))
 
         # Act
         await response({}, mock_receive, mock_send)

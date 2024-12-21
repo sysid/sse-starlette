@@ -12,13 +12,17 @@ class BasicContainer(DockerContainer):
 
         self.app_path = "tests.integration.main_endless:app"
 
-        self.with_volume_mapping(host="/Users/Q187392/dev/s/public/sse-starlette", container="/app")
+        self.with_volume_mapping(
+            host="/Users/Q187392/dev/s/public/sse-starlette", container="/app"
+        )
         self.with_name("sse_starlette")
         self.with_exposed_ports(8000)
 
         # Set a basic command to keep the container running
         # self.with_command("tail -f /dev/null")
-        self.with_command(f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level debug")
+        self.with_command(
+            f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level debug"
+        )
 
 
 if __name__ == "__main__":
@@ -27,7 +31,9 @@ if __name__ == "__main__":
     with container:
         wait_for_logs(container, "Application startup complete", timeout=10)
         print(f"Container is running. ID: {container._container.id}")
-        print(f"Exec into the container using: docker exec -it {container._container.id} sh")
+        print(
+            f"Exec into the container using: docker exec -it {container._container.id} sh"
+        )
 
         print(f"http://localhost:{container.get_exposed_port(8000)}/endless")
         sleep(100000)  # Keep the container running

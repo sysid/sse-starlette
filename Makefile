@@ -5,6 +5,7 @@ SOURCEDIR     = source
 BUILDDIR      = build
 MAKE          = make
 VERSION       = $(shell cat VERSION)
+PACKAGE_NAME  = sse-starlette
 
 app_root := $(if $(PROJ_DIR),$(PROJ_DIR),$(CURDIR))
 pkg_src =  $(app_root)/sse_starlette
@@ -16,28 +17,27 @@ all: clean build upload  ## Build and upload
 	@echo "-M- building and distributing"
 	@echo "--------------------------------------------------------------------------------"
 
+################################################################################
+# Development \
+DEVELOP: ## ############################################################
+
 build-docker: ## build docker image
 	@echo "building docker image"
 	docker build --platform linux/amd64 --progress=plain -t sse_starlette .
-	#docker tag $(IMAGE_NAME) 339712820866.dkr.ecr.eu-central-1.amazonaws.com/ticketron/backend:latest
+	#docker tag $(IMAGE_NAME) 339712820866.dkr.ecr.eu-central-1.amazonaws.com/sse-starlette/sse-starlette:latest
 
 ################################################################################
 # Building, Deploying \
 BUILDING:  ## ############################################################
 .PHONY: build
-build: clean format sort-imports  ## format and build
+build: clean format  ## format and build
 	@echo "building"
-	#python -m build
-	pdm build
+	python -m build
 
 .PHONY: publish
 publish:  ## publish
 	@echo "upload to Pypi"
-	#twine upload --verbose dist/*
-	#@git log -10 --pretty=format:"%h %aN %ar %d %s" | grep main | grep Bump && \
-		#twine upload --verbose dist/* || \
-		#echo "Bump Version before trying to upload"
-	pdm publish
+	twine upload --verbose dist/*
 
 .PHONY: bump-major
 bump-major:  ## bump-major, tag and push
@@ -98,12 +98,8 @@ format:  ## perform ruff formatting
 format-check:  ## perform black formatting
 	@ruff format --check $(pkg_src) $(tests_src)
 
-.PHONY: sort-imports
-sort-imports:  ## apply import sort ordering
-	isort $(pkg_src) $(tests_src) --profile black
-
 .PHONY: style
-style: sort-imports format  ## perform code style format (black, isort)
+style: sort-imports format  ## perform code style format
 
 .PHONY: lint
 lint:  ## check style with ruff

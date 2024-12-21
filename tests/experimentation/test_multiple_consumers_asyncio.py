@@ -31,7 +31,7 @@ class ServerManager:
             host=self.host,
             port=self.port,
             log_level="error",
-            loop="asyncio"
+            loop="asyncio",
         )
 
         self.server = uvicorn.Server(config=config)
@@ -59,7 +59,7 @@ class ServerManager:
                     if await self.health_check():
                         break
                     retry_count += 1
-                    await asyncio.sleep(0.2 * (2 ** retry_count))
+                    await asyncio.sleep(0.2 * (2**retry_count))
                 else:
                     raise RuntimeError("Server health check failed after retries")
 
@@ -75,7 +75,7 @@ class ServerManager:
         if self.server and not self._shutdown_complete.is_set():
             try:
                 self.server.should_exit = True
-                if hasattr(self, '_server_task'):
+                if hasattr(self, "_server_task"):
                     try:
                         async with timeout(5):  # 5 second timeout for shutdown
                             await self._server_task
@@ -127,15 +127,14 @@ class SSEClient:
         self.errors: List[Exception] = []
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10)
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
     async def connect_and_consume(self) -> None:
         """Connect to SSE stream and consume messages"""
         try:
             async with httpx.AsyncClient() as client:
                 async with timeout(20):  # 20 second timeout for stream consumption
-                    async with client.stream('GET', self.url) as response:
+                    async with client.stream("GET", self.url) as response:
                         async for line in response.aiter_lines():
                             if line.strip():  # Only count non-empty lines
                                 self.received_lines += 1
@@ -153,12 +152,10 @@ class SSEClient:
     [
         ("tests.integration.main_endless:app", 14),
         ("tests.integration.main_endless_conditional:app", 2),
-    ]
+    ],
 )
 async def test_sse_multiple_consumers(
-    app_path: str,
-    expected_lines: int,
-    num_consumers: int = 3
+    app_path: str, expected_lines: int, num_consumers: int = 3
 ):
     """Test multiple consumers connecting to SSE endpoint"""
 
@@ -180,8 +177,7 @@ async def test_sse_multiple_consumers(
 
                 # Wait for all consumers or first error
                 done, pending = await asyncio.wait(
-                    consumer_tasks,
-                    return_when=asyncio.FIRST_EXCEPTION
+                    consumer_tasks, return_when=asyncio.FIRST_EXCEPTION
                 )
 
                 # Cancel any pending tasks
@@ -202,8 +198,9 @@ async def test_sse_multiple_consumers(
 
                 # Verify expectations
                 for i, client in enumerate(clients):
-                    assert client.received_lines == expected_lines, \
-                        f"Client {i} received {client.received_lines} lines, expected {expected_lines}"
+                    assert (
+                        client.received_lines == expected_lines
+                    ), f"Client {i} received {client.received_lines} lines, expected {expected_lines}"
 
                 assert not errors, f"Consumers encountered errors: {errors}"
 

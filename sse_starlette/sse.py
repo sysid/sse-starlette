@@ -31,6 +31,7 @@ class SendTimeoutError(TimeoutError):
 
 class AppStatus:
     """Helper to capture a shutdown signal from Uvicorn so we can gracefully terminate SSE streams."""
+
     should_exit = False
     should_exit_event: Union[anyio.Event, None] = None
     original_handler = None
@@ -47,10 +48,13 @@ class AppStatus:
 
 try:
     from uvicorn.main import Server
+
     AppStatus.original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit  # type: ignore
 except ImportError:
-    logger.debug("Uvicorn not installed. Graceful shutdown on server termination disabled.")
+    logger.debug(
+        "Uvicorn not installed. Graceful shutdown on server termination disabled."
+    )
 
 Content = Union[str, bytes, dict, ServerSentEvent, Any]
 SyncContentStream = Iterator[Content]
@@ -62,6 +66,7 @@ class EventSourceResponse(Response):
     """
     Streaming response that sends data conforming to the SSE (Server-Sent Events) specification.
     """
+
     DEFAULT_PING_INTERVAL = 15
     DEFAULT_SEPARATOR = "\r\n"
 
@@ -75,10 +80,11 @@ class EventSourceResponse(Response):
         ping: Optional[int] = None,
         sep: Optional[str] = None,
         ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
-        data_sender_callable: Optional[Callable[[], Coroutine[None, None, None]]] = None,
+        data_sender_callable: Optional[
+            Callable[[], Coroutine[None, None, None]]
+        ] = None,
         send_timeout: Optional[float] = None,
     ) -> None:
-
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
             raise ValueError(f"sep must be one of: \\r\\n, \\r, \\n, got: {sep}")
@@ -136,7 +142,7 @@ class EventSourceResponse(Response):
         raise NotImplementedError("Compression is not supported for SSE streams.")
 
     async def _stream_response(self, send: Send) -> None:
-        """ Send out SSE data to the client as it becomes available in the iterator. """
+        """Send out SSE data to the client as it becomes available in the iterator."""
         await send(
             {
                 "type": "http.response.start",
@@ -149,7 +155,9 @@ class EventSourceResponse(Response):
             chunk = ensure_bytes(data, self.sep)
             logger.debug("chunk: %s", chunk)
             with anyio.move_on_after(self.send_timeout) as cancel_scope:
-                await send({"type": "http.response.body", "body": chunk, "more_body": True})
+                await send(
+                    {"type": "http.response.body", "body": chunk, "more_body": True}
+                )
 
             if cancel_scope and cancel_scope.cancel_called:
                 if hasattr(self.body_iterator, "aclose"):
@@ -162,7 +170,7 @@ class EventSourceResponse(Response):
 
     @staticmethod
     async def _listen_for_disconnect(receive: Receive) -> None:
-        """ Watch for a disconnect message from the client. """
+        """Watch for a disconnect message from the client."""
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
@@ -171,7 +179,7 @@ class EventSourceResponse(Response):
 
     @staticmethod
     async def _listen_for_exit_signal() -> None:
-        """ Watch for shutdown signals (e.g. SIGINT, SIGTERM) so we can break the event loop. """
+        """Watch for shutdown signals (e.g. SIGINT, SIGTERM) so we can break the event loop."""
         # Check if should_exit was set before anybody started waiting
         if AppStatus.should_exit:
             return
@@ -186,7 +194,7 @@ class EventSourceResponse(Response):
         await AppStatus.should_exit_event.wait()
 
     async def _ping(self, send: Send) -> None:
-        """ Periodically send ping messages to keep the connection alive on proxies.
+        """Periodically send ping messages to keep the connection alive on proxies.
         - frequenccy ca every 15 seconds.
         - Alternatively one can send periodically a comment line (one starting with a ':' character)
         """
@@ -195,17 +203,25 @@ class EventSourceResponse(Response):
             sse_ping = (
                 self.ping_message_factory()
                 if self.ping_message_factory
-                else ServerSentEvent(comment=f"ping - {datetime.now(timezone.utc)}", sep=self.sep)
+                else ServerSentEvent(
+                    comment=f"ping - {datetime.now(timezone.utc)}", sep=self.sep
+                )
             )
             ping_bytes = ensure_bytes(sse_ping, self.sep)
             logger.debug("ping: %s", ping_bytes)
 
             async with self._send_lock:
                 if self.active:
-                    await send({"type": "http.response.body", "body": ping_bytes, "more_body": True})
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": ping_bytes,
+                            "more_body": True,
+                        }
+                    )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """ Entrypoint for Starlette's ASGI contract. We spin up tasks:
+        """Entrypoint for Starlette's ASGI contract. We spin up tasks:
         - _stream_response to push events
         - _ping to keep the connection alive
         - _listen_for_exit_signal to respond to server shutdown

@@ -4,6 +4,7 @@ import logging
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
+from httpx import ASGITransport
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -78,7 +79,11 @@ def reset_appstatus_event():
 
 @pytest.fixture
 async def httpx_client(reset_appstatus_event, app):
-    async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as client:
+    transport = ASGITransport(app=app)
+
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         _log.info("Yielding Client")
         yield client
 

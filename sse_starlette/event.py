@@ -7,6 +7,7 @@ class ServerSentEvent:
     """
     Helper class to format data for Server-Sent Events (SSE).
     """
+
     _LINE_SEP_EXPR = re.compile(r"\r\n|\r|\n")
     DEFAULT_SEPARATOR = "\r\n"
 
@@ -39,7 +40,9 @@ class ServerSentEvent:
 
         if self.event is not None:
             # Clean newlines in the event name
-            buffer.write("event: " + self._LINE_SEP_EXPR.sub("", self.event) + self._sep)
+            buffer.write(
+                "event: " + self._LINE_SEP_EXPR.sub("", self.event) + self._sep
+            )
 
         if self.data is not None:
             # Break multi-line data into multiple data: lines

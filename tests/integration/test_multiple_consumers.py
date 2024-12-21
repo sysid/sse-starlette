@@ -15,9 +15,13 @@ class SSEServerContainer(DockerContainer):
         self.app_path = app_path
 
         # Mount the current directory into the container
-        self.with_volume_mapping(host="/Users/Q187392/dev/s/public/sse-starlette", container="/app")
+        self.with_volume_mapping(
+            host="/Users/Q187392/dev/s/public/sse-starlette", container="/app"
+        )
         self.with_name("sse_starlette_test")
-        self.with_command(f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level info")
+        self.with_command(
+            f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level info"
+        )
 
         # Expose the port
         self.with_exposed_ports(8000)
@@ -28,7 +32,7 @@ async def consume_events(url: str, expected_lines: int = 2):
     i = 0
     async with httpx.AsyncClient() as client:
         try:
-            async with client.stream('GET', url) as response:
+            async with client.stream("GET", url) as response:
                 async for line in response.aiter_lines():
                     if line.strip():
                         _log.info(f"Received line: {line}")
@@ -77,20 +81,26 @@ async def test_sse_server_termination(caplog, app_path, expected_lines):
 
         # Check error count: one connection error per client
         error_count = sum(1 for _, error in results if error is not None)
-        assert error_count == N_CONSUMERS, f"Expected {N_CONSUMERS} errors, got {error_count}"
+        assert (
+            error_count == N_CONSUMERS
+        ), f"Expected {N_CONSUMERS} errors, got {error_count}"
 
         # Verify error messages
         for _, error in results:
-            assert error and "peer closed connection without sending complete message body (incomplete chunked read)" in error.lower(), \
-                "Expected peer closed connection error"
+            assert (
+                error
+                and "peer closed connection without sending complete message body (incomplete chunked read)"
+                in error.lower()
+            ), "Expected peer closed connection error"
 
         # Check message counts
         message_counts = [count for count, _ in results]
         _log.info(f"Message counts received: {message_counts}")
 
         # Since we're killing the server early, we expect incomplete message counts
-        assert all(count < expected_lines for count in message_counts), \
-            f"Expected all counts to be less than {expected_lines}, got {message_counts}"
+        assert all(
+            count < expected_lines for count in message_counts
+        ), f"Expected all counts to be less than {expected_lines}, got {message_counts}"
 
     finally:
         # Cleanup container if it's still around
