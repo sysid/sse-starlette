@@ -32,6 +32,7 @@ class AppStatus:
     """Helper to capture a shutdown signal from Uvicorn so we can gracefully terminate SSE streams."""
     should_exit = False
     should_exit_event: Union[anyio.Event, None] = None
+    original_handler = None
 
     @staticmethod
     def handle_exit(*args, **kwargs):
@@ -39,15 +40,16 @@ class AppStatus:
         AppStatus.should_exit = True
         if AppStatus.should_exit_event is not None:
             AppStatus.should_exit_event.set()
-        original_handler(*args, **kwargs)
+        if AppStatus.original_handler is not None:
+            AppStatus.original_handler(*args, **kwargs)
 
 
 try:
     from uvicorn.main import Server
-    original_handler = Server.handle_exit
+    AppStatus.original_handler = Server.handle_exit
     Server.handle_exit = AppStatus.handle_exit  # type: ignore
-except ModuleNotFoundError:
-    logger.debug("Uvicorn not used.")
+except ImportError:
+    logger.debug("Uvicorn not installed. Graceful shutdown on server termination disabled.")
 
 
 class ServerSentEvent:

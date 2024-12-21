@@ -37,6 +37,7 @@ homepage = "https://github.com/sysid/sse-starlette"
 Source = "https://github.com/sysid/sse-starlette"
 
 [project.optional-dependencies]
+uvicorn = ["uvicorn"]
 examples = ["fastapi"]
 
 [tool.pytest.ini_options]
