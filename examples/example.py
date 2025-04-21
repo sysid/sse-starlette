@@ -8,6 +8,9 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
 from sse_starlette.sse import EventSourceResponse
+from starlette.types import Message
+
+logger = logging.getLogger(__name__)
 
 # unpatch_uvicorn_signal_handler()  # if you want to rollback monkeypatching of uvcorn signal-handler
 
@@ -44,6 +47,9 @@ async def numbers(minimum, maximum):
         await asyncio.sleep(0.9)
         yield dict(data=i)
 
+async def client_close_handle(message: Message):
+    logger.debug(f"client_close_handle: {message}")
+
 
 async def endless(req: Request):
     """Simulates and endless stream
@@ -65,7 +71,7 @@ async def endless(req: Request):
             # Do any other cleanup, if any
             raise e
 
-    return EventSourceResponse(event_publisher())
+    return EventSourceResponse(content=event_publisher(), client_close_handler_callable=client_close_handle)
 
 
 async def sse(request):
