@@ -11,31 +11,36 @@ This example shows how to use a stream to push messages to a single client
 
 class Stream:
     def __init__(self) -> None:
-        self._queue = asyncio.Queue[ServerSentEvent]()
+        self._queue = None
+
+    @property
+    def queue(self):
+        if self._queue is None:
+            self._queue = asyncio.Queue[ServerSentEvent]()
+        return self._queue
 
     def __aiter__(self) -> "Stream":
         return self
 
     async def __anext__(self) -> ServerSentEvent:
-        return await self._queue.get()
+        return await self.queue.get()
 
     async def asend(self, value: ServerSentEvent) -> None:
-        await self._queue.put(value)
+        await self.queue.put(value)
 
 
 app = FastAPI()
 
 _stream = Stream()
-app.dependency_overrides[Stream] = lambda: _stream
 
 
 @app.get("/sse")
-async def sse(stream: Stream = Depends()) -> EventSourceResponse:
+async def sse(stream: Stream = Depends(lambda: _stream)) -> EventSourceResponse:
     return EventSourceResponse(stream)
 
 
 @app.post("/message", status_code=status.HTTP_201_CREATED)
-async def send_message(message: str, stream: Stream = Depends()) -> None:
+async def send_message(message: str, stream: Stream = Depends(lambda: _stream)) -> None:
     await stream.asend(
         ServerSentEvent(data=message)
     )
