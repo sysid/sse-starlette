@@ -84,7 +84,7 @@ class EventSourceResponse(Response):
             Callable[[], Coroutine[None, None, None]]
         ] = None,
         send_timeout: Optional[float] = None,
-        client_close_handler_callable: Optional[Callable[[Message], None]] = None
+        client_close_handler_callable: Optional[Callable[[Message], None]] = None,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -171,7 +171,6 @@ class EventSourceResponse(Response):
             self.active = False
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
-
     async def _listen_for_disconnect(self, receive: Receive) -> None:
         """Watch for a disconnect message from the client."""
         while self.active:
@@ -179,7 +178,7 @@ class EventSourceResponse(Response):
             if message["type"] == "http.disconnect":
                 self.active = False
                 logger.debug("Got event: http.disconnect. Stop streaming.")
-                if (self.client_close_handler_callable):
+                if self.client_close_handler_callable:
                     await self.client_close_handler_callable(message)
                 break
 
