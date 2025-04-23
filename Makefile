@@ -40,38 +40,43 @@ publish:  ## publish
 	twine upload --verbose dist/*
 
 .PHONY: bump-major
-bump-major:  ## bump-major, tag and push
+bump-major:  check-github-token  ## bump-major, tag and push
 	bump-my-version bump --commit --tag major
 	git push
 	git push --tags
 	@$(MAKE) create-release
 
 .PHONY: bump-minor
-bump-minor:  ## bump-minor, tag and push
+bump-minor:  check-github-token  ## bump-minor, tag and push
 	bump-my-version bump --commit --tag minor
 	git push
 	git push --tags
 	@$(MAKE) create-release
 
 .PHONY: bump-patch
-bump-patch:  ## bump-patch, tag and push
+bump-patch:  check-github-token  ## bump-patch, tag and push
 	bump-my-version bump --commit --tag patch
 	git push
 	git push --tags
 	@$(MAKE) create-release
 
 .PHONY: create-release
-create-release:  ## create a release on GitHub via the gh cli
+create-release: check-github-token  ## create a release on GitHub via the gh cli
 	@if ! command -v gh &>/dev/null; then \
 		echo "You do not have the GitHub CLI (gh) installed. Please create the release manually."; \
-		exit 1; \
-	elif [ -z "$$GITHUB_TOKEN" ]; then \
-		echo "GITHUB_TOKEN is not set. Please export your GitHub token before running this command."; \
 		exit 1; \
 	else \
 		echo "Creating GitHub release for v$(VERSION)"; \
 		gh release create "v$(VERSION)" --generate-notes; \
 	fi
+
+.PHONY: check-github-token
+check-github-token:  ## Check if GITHUB_TOKEN is set
+	@if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "GITHUB_TOKEN is not set. Please export your GitHub token before running this command."; \
+		exit 1; \
+	fi
+	@echo "GITHUB_TOKEN is set"
 
 ################################################################################
 # Testing \
