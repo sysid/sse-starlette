@@ -62,12 +62,15 @@ bump-patch:  ## bump-patch, tag and push
 
 .PHONY: create-release
 create-release:  ## create a release on GitHub via the gh cli
-	@if command -v gh version &>/dev/null; then \
+	@if ! command -v gh &>/dev/null; then \
+		echo "You do not have the GitHub CLI (gh) installed. Please create the release manually."; \
+		exit 1; \
+	elif [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "GITHUB_TOKEN is not set. Please export your GitHub token before running this command."; \
+		exit 1; \
+	else \
 		echo "Creating GitHub release for v$(VERSION)"; \
 		gh release create "v$(VERSION)" --generate-notes; \
-	else \
-		echo "You do not have the github-cli installed. Please create release from the repo manually."; \
-		exit 1; \
 	fi
 
 ################################################################################
