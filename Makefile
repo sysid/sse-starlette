@@ -74,13 +74,23 @@ create-release:  ## create a release on GitHub via the gh cli
 # Testing \
 TESTING:  ## ############################################################
 .PHONY: test
-test:  ## run tests
+test: test-unit test-docker  ## run tests
 	#python -m pytest -ra --junitxml=report.xml --cov-config=pyproject.toml --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
-	RUN_ENV=local python -m pytest -m "not (experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	#RUN_ENV=local python -m pytest -m "not (experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	:
 
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
 	RUN_ENV=local python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+
+.PHONY: test-docker
+test-docker:  ## test-docker (docker desktop: advanced settings)
+	@if [ -S /var/run/docker.sock > /dev/null 2>&1 ]; then \
+		echo "Running docker tests because /var/run/docker.docker exists..."; \
+		RUN_ENV=local python -m pytest -m "integration" tests; \
+	else \
+		echo "Skipping tests: /var/run/docker.sock does not exist."; \
+	fi
 
 .PHONY: tox
 tox:   ## Run tox
