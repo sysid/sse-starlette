@@ -17,7 +17,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
 from starlette.datastructures import MutableHeaders
 from starlette.responses import Response
-from starlette.types import Receive, Scope, Send
+from starlette.types import Receive, Scope, Send, Message
 
 from sse_starlette.event import ServerSentEvent, ensure_bytes
 
@@ -84,6 +84,7 @@ class EventSourceResponse(Response):
             Callable[[], Coroutine[None, None, None]]
         ] = None,
         send_timeout: Optional[float] = None,
+        client_close_handler_callable: Optional[Callable[[Message], None]] = None
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -121,6 +122,8 @@ class EventSourceResponse(Response):
 
         self.ping_interval = self.DEFAULT_PING_INTERVAL if ping is None else ping
         self.ping_message_factory = ping_message_factory
+
+        self.client_close_handler_callable = client_close_handler_callable
 
         self.active = True
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
@@ -168,13 +171,16 @@ class EventSourceResponse(Response):
             self.active = False
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
-    @staticmethod
-    async def _listen_for_disconnect(receive: Receive) -> None:
+
+    async def _listen_for_disconnect(self, receive: Receive) -> None:
         """Watch for a disconnect message from the client."""
-        while True:
+        while self.active:
             message = await receive()
             if message["type"] == "http.disconnect":
+                self.active = False
                 logger.debug("Got event: http.disconnect. Stop streaming.")
+                if (self.client_close_handler_callable):
+                    await self.client_close_handler_callable(message)
                 break
 
     @staticmethod
