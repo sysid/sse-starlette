@@ -84,7 +84,9 @@ class EventSourceResponse(Response):
             Callable[[], Coroutine[None, None, None]]
         ] = None,
         send_timeout: Optional[float] = None,
-        client_close_handler_callable: Optional[Callable[[Message], Awaitable[None]]] = None,
+        client_close_handler_callable: Optional[
+            Callable[[Message], Awaitable[None]]
+        ] = None,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
