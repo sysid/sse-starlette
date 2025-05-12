@@ -248,7 +248,7 @@ class EventSourceResponse(Response):
                 task_group.start_soon(self.data_sender_callable)
 
             # Wait for the client to disconnect last
-            await cancel_on_finish(lambda: self._listen_for_disconnect(receive))
+            task_group.start_soon(cancel_on_finish, lambda: self._listen_for_disconnect(receive))
 
         if self.background is not None:
             await self.background()
