@@ -1,3 +1,4 @@
+# sse_starlette/sse.py
 import logging
 from datetime import datetime, timezone
 from typing import (
@@ -29,32 +30,8 @@ class SendTimeoutError(TimeoutError):
     pass
 
 
-class AppStatus:
-    """Helper to capture a shutdown signal from Uvicorn so we can gracefully terminate SSE streams."""
-
-    should_exit = False
-    should_exit_event: Union[anyio.Event, None] = None
-    original_handler = None
-
-    @staticmethod
-    def handle_exit(*args, **kwargs):
-        # Mark that the app should exit, and signal all waiters.
-        AppStatus.should_exit = True
-        if AppStatus.should_exit_event is not None:
-            AppStatus.should_exit_event.set()
-        if AppStatus.original_handler is not None:
-            AppStatus.original_handler(*args, **kwargs)
-
-
-try:
-    from uvicorn.main import Server
-
-    AppStatus.original_handler = Server.handle_exit
-    Server.handle_exit = AppStatus.handle_exit  # type: ignore
-except ImportError:
-    logger.debug(
-        "Uvicorn not installed. Graceful shutdown on server termination disabled."
-    )
+# Import the enhanced AppStatus
+from .appstatus import AppStatus
 
 Content = Union[str, bytes, dict, ServerSentEvent, Any]
 SyncContentStream = Iterator[Content]
@@ -131,6 +108,9 @@ class EventSourceResponse(Response):
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
         self._send_lock = anyio.Lock()
 
+        # Ensure AppStatus is initialized
+        AppStatus.initialize()
+
     @property
     def ping_interval(self) -> Union[int, float]:
         return self._ping_interval
@@ -184,22 +164,6 @@ class EventSourceResponse(Response):
                     await self.client_close_handler_callable(message)
                 break
 
-    @staticmethod
-    async def _listen_for_exit_signal() -> None:
-        """Watch for shutdown signals (e.g. SIGINT, SIGTERM) so we can break the event loop."""
-        # Check if should_exit was set before anybody started waiting
-        if AppStatus.should_exit:
-            return
-
-        if AppStatus.should_exit_event is None:
-            AppStatus.should_exit_event = anyio.Event()
-
-        # Check if should_exit got set while we set up the event
-        if AppStatus.should_exit:
-            return
-
-        await AppStatus.should_exit_event.wait()
-
     async def _ping(self, send: Send) -> None:
         """Periodically send ping messages to keep the connection alive on proxies.
         - frequenccy ca every 15 seconds.
@@ -242,7 +206,8 @@ class EventSourceResponse(Response):
 
             task_group.start_soon(cancel_on_finish, lambda: self._stream_response(send))
             task_group.start_soon(cancel_on_finish, lambda: self._ping(send))
-            task_group.start_soon(cancel_on_finish, self._listen_for_exit_signal)
+            # noinspection PyProtectedMember
+            task_group.start_soon(cancel_on_finish, AppStatus._listen_for_exit_signal)
 
             if self.data_sender_callable:
                 task_group.start_soon(self.data_sender_callable)
