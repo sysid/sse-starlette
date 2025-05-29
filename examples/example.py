@@ -6,15 +6,12 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
+from starlette.types import Message
 
 from sse_starlette.sse import EventSourceResponse
-from starlette.types import Message
 
 logger = logging.getLogger(__name__)
 
-# unpatch_uvicorn_signal_handler()  # if you want to rollback monkeypatching of uvcorn signal-handler
-
-_log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
 datefmt = "%Y-%m-%d %H:%M:%S"
 logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
@@ -47,6 +44,7 @@ async def numbers(minimum, maximum):
         await asyncio.sleep(0.9)
         yield dict(data=i)
 
+
 async def client_close_handle(message: Message):
     logger.debug(f"client_close_handle: {message}")
 
@@ -67,7 +65,7 @@ async def endless(req: Request):
                 yield dict(data=i)
                 await asyncio.sleep(0.9)
         except asyncio.CancelledError as e:
-            _log.info(f"Disconnected from client (via refresh/close) {req.client}")
+            logger.info(f"Disconnected from client (via refresh/close) {req.client}")
             # Do any other cleanup, if any
             raise e
 

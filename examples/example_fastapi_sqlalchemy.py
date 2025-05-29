@@ -1,4 +1,5 @@
 import typing as T
+import uvicorn
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI
@@ -45,3 +46,6 @@ async def things(db_session: AsyncDbSessionDependency):
                 yield {"data": dict(row)}
 
     return EventSourceResponse(thing_streamer)
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
