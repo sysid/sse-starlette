@@ -23,15 +23,24 @@ classifiers = [
 ]
 dependencies = [
     "anyio>=4.7.0",
-    "starlette>=0.41.3",
 ]
 
 [project.optional-dependencies]
 examples = [
-    "fastapi",
+    "uvicorn>=0.34.0",
+    "fastapi>=0.115.12",
+    "sqlalchemy[asyncio,examples]>=2.0.41",
+    "starlette>=0.41.3",
+    "aiosqlite>=0.21.0",
 ]
 uvicorn = [
     "uvicorn>=0.34.0",
+]
+granian = [
+    "granian>=2.3.1",
+]
+daphne = [
+    "daphne>=4.2.0",
 ]
 
 [dependency-groups]  # new standard, included by default

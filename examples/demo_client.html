@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Client Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .message {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .message.data {
+            background-color: #e3f2fd;
+        }
+
+        .message.error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+
+        .message.system {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .message-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Server-Sent Events (SSE) Client Example</h1>
+
+    <div class="container">
+        <h2>Connection Control</h2>
+        <input type="text" id="urlInput" class="url-input" value="http://localhost:8000/events"
+               placeholder="Enter SSE endpoint URL">
+
+        <div class="controls">
+            <button id="connectBtn" class="btn-primary" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" class="btn-danger" onclick="disconnect()" disabled>Disconnect</button>
+            <button id="clearBtn" class="btn-secondary" onclick="clearMessages()">Clear Messages</button>
+        </div>
+
+        <div id="status" class="status disconnected">Disconnected</div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div id="messageCount" class="stat-value">0</div>
+                <div class="stat-label">Messages</div>
+            </div>
+            <div class="stat-item">
+                <div id="errorCount" class="stat-value">0</div>
+                <div class="stat-label">Errors</div>
+            </div>
+            <div class="stat-item">
+                <div id="connectionTime" class="stat-value">0s</div>
+                <div class="stat-label">Connected Time</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Send Message (for broadcasting examples)</h2>
+        <div class="message-form">
+            <input type="text" id="messageInput" class="message-input"
+                   placeholder="Enter message to broadcast" value="Hello from HTML client!">
+            <button id="sendBtn" class="btn-primary" onclick="sendMessage()">Send Message</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Messages</h2>
+        <div id="messages" class="messages"></div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let messageCount = 0;
+        let errorCount = 0;
+        let connectionStartTime = null;
+        let connectionTimer = null;
+
+        // UI Elements
+        const statusEl = document.getElementById('status');
+        const messagesEl = document.getElementById('messages');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const urlInput = document.getElementById('urlInput');
+        const messageCountEl = document.getElementById('messageCount');
+        const errorCountEl = document.getElementById('errorCount');
+        const connectionTimeEl = document.getElementById('connectionTime');
+        const messageInput = document.getElementById('messageInput');
+
+        function updateStatus(status, message) {
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = message;
+        }
+
+        function addMessage(content, type = 'data') {
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            messageEl.innerHTML = `
+                <span class="timestamp">${timestamp}</span> - ${content}
+            `;
+
+            messagesEl.appendChild(messageEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            if (type === 'error') {
+                errorCount++;
+                errorCountEl.textContent = errorCount;
+            } else if (type === 'data') {
+                messageCount++;
+                messageCountEl.textContent = messageCount;
+            }
+        }
+
+        function updateConnectionTime() {
+            if (connectionStartTime) {
+                const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+                connectionTimeEl.textContent = `${elapsed}s`;
+            }
+        }
+
+        function connect() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a valid URL');
+                return;
+            }
+
+            if (eventSource) {
+                disconnect();
+            }
+
+            updateStatus('connecting', 'Connecting...');
+            connectBtn.disabled = true;
+
+            try {
+                eventSource = new EventSource(url);
+                connectionStartTime = Date.now();
+                connectionTimer = setInterval(updateConnectionTime, 1000);
+
+                eventSource.onopen = function(event) {
+                    updateStatus('connected', `Connected to ${url}`);
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    addMessage('Connection established', 'system');
+                };
+
+                eventSource.onmessage = function(event) {
+                    let data = event.data;
+
+                    // Try to parse JSON for better display
+                    try {
+                        const parsed = JSON.parse(data);
+                        data = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        // Not JSON, display as-is
+                    }
+
+                    addMessage(`Data: ${data}`, 'data');
+                };
+
+                eventSource.onerror = function(event) {
+                    console.error('SSE Error:', event);
+                    addMessage('Connection error occurred', 'error');
+
+                    if (eventSource.readyState === EventSource.CLOSED) {
+                        updateStatus('disconnected', 'Connection closed');
+                        connectBtn.disabled = false;
+                        disconnectBtn.disabled = true;
+                        clearInterval(connectionTimer);
+                        connectionStartTime = null;
+                    }
+                };
+
+                // Listen for custom events
+                ['error', 'alert', 'system', 'task', 'custom', 'success', 'recovery', 'fatal_error', 'multiline'].forEach(eventType => {
+                    eventSource.addEventListener(eventType, function(event) {
+                        addMessage(`[${eventType.toUpperCase()}] ${event.data}`, eventType === 'error' || eventType === 'fatal_error' ? 'error' : 'system');
+                    });
+                });
+
+            } catch (error) {
+                updateStatus('disconnected', 'Connection failed');
+                connectBtn.disabled = false;
+                addMessage(`Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            updateStatus('disconnected', 'Disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            clearInterval(connectionTimer);
+            connectionStartTime = null;
+            addMessage('Connection closed', 'system');
+        }
+
+        function clearMessages() {
+            messagesEl.innerHTML = '';
+            messageCount = 0;
+            errorCount = 0;
+            messageCountEl.textContent = '0';
+            errorCountEl.textContent = '0';
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        event: 'broadcast'
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addMessage(`Message sent successfully to ${result.clients} clients`, 'system');
+                    messageInput.value = '';
+                } else {
+                    addMessage(`Failed to send message: ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addMessage(`Error sending message: ${error.message}`, 'error');
+            }
+        }
+
+        // Allow Enter key to send messages
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Allow Enter key to connect
+        urlInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !connectBtn.disabled) {
+                connect();
+            }
+        });
+
+        // Initialize
+        addMessage('SSE Client ready. Enter a URL and click Connect to start.', 'system');
+    </script>
+</body>
+</html>

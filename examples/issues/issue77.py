@@ -3,7 +3,7 @@
 # e.g. test for lock contention: https://github.com/sysid/sse-starlette/issues/77
 #
 # to run it:
-# PYTHONPATH=. uvicorn examples.load_test:app
+# PYTHONPATH=. uvicorn examples.issue77:app
 # curl http://localhost:8000/stream | pv --line-mode --average-rate > /dev/null
 ################################################################################
 
