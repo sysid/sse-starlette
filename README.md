@@ -1,194 +1,314 @@
-# Server Sent Events for [Starlette](https://github.com/encode/starlette) and [FastAPI](https://fastapi.tiangolo.com/)
+# Server-Sent Events for [Starlette](https://github.com/encode/starlette) and [FastAPI](https://fastapi.tiangolo.com/)
 
 [![Downloads](https://static.pepy.tech/badge/sse-starlette/week)](https://pepy.tech/project/sse-starlette)
 [![PyPI Version][pypi-image]][pypi-url]
 [![Build Status][build-image]][build-url]
 [![Code Coverage][coverage-image]][coverage-url]
 
-> Implements the [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) specification.
+> Background: https://sysid.github.io/server-sent-events/
 
-Background: https://sysid.github.io/server-sent-events/
+Production ready Server-Sent Events implementation for Starlette and FastAPI following the [W3C SSE specification](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events).
 
-Installation:
+## Installation
 
-```shell
+```bash
 pip install sse-starlette
+uv add sse-starlette
+
+# To run the examples and demonstrations
+uv add sse-starlette[examples]
+
+# Recommended ASGI server
+uv add sse-starlette[uvicorn,granian,daphne]
 ```
 
-Usage:
+## Quick Start
 
 ```python
 import asyncio
-import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Route
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette import EventSourceResponse
 
-async def numbers(minimum, maximum):
-    for i in range(minimum, maximum + 1):
-        await asyncio.sleep(0.9)
-        yield dict(data=i)
+async def generate_events():
+    for i in range(10):
+        yield {"data": f"Event {i}"}
+        await asyncio.sleep(1)
 
-async def sse(request):
-    generator = numbers(1, 5)
-    return EventSourceResponse(generator)
+async def sse_endpoint(request):
+    return EventSourceResponse(generate_events())
 
-routes = [
-    Route("/", endpoint=sse)
-]
-
-app = Starlette(debug=True, routes=routes)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level='info')
+app = Starlette(routes=[Route("/events", sse_endpoint)])
 ```
 
-Output:
-![output](output.png)
+## Core Features
 
-**Caveat:** SSE streaming does not work in combination with [GZipMiddleware](https://github.com/encode/starlette/issues/20#issuecomment-704106436).
+- **Standards Compliant**: Full SSE specification implementation
+- **Framework Integration**: Native Starlette and FastAPI support
+- **Async/Await**: Built on modern Python async patterns
+- **Connection Management**: Automatic client disconnect detection
+- **Graceful Shutdown**: Proper cleanup on server termination
 
-Be aware that for proper server shutdown your application must stop all
-running tasks (generators). Otherwise you might experience the following warnings
-at shutdown: `Waiting for background tasks to complete. (CTRL+C to force quit)`.
+## Key Components
 
-Client disconnects need to be handled in your Request handler (see example.py):
+### EventSourceResponse
+
+The main response class that handles SSE streaming:
+
 ```python
-async def endless(req: Request):
-    async def event_publisher():
-        i = 0
-        try:
-          while True:
-              i += 1
-              yield dict(data=i)
-              await asyncio.sleep(0.2)
-        except asyncio.CancelledError as e:
-          _log.info(f"Disconnected from client (via refresh/close) {req.client}")
-          # Do any other cleanup, if any
-          raise e
-    return EventSourceResponse(event_publisher())
+from sse_starlette import EventSourceResponse
+
+# Basic usage
+async def stream_data():
+    for item in data:
+        yield {"data": item, "event": "update", "id": str(item.id)}
+
+return EventSourceResponse(stream_data())
 ```
 
-# Thread Safety with SQLAlchemy Sessions and Similar Objects
+### ServerSentEvent
 
-The streaming portion of this package is accomplished via anyio TaskGroups. Care
-needs to be taken to avoid passing objects that are not thread-safe to generators
-you use to yield streaming data.
-
-For example, if you are using SQLAlchemy, you should not use/pass an `AsyncSession`
-object to your generator:
+For structured event creation:
 
 ```python
-# ❌ This can result in "The garbage collector is trying to clean up non-checked-in connection..." errors
-async def bad_route():
-    async with AsyncSession() as session:
-        async def generator():
-            async for row in session.execute(select(User)):
-                yield dict(data=row)
+from sse_starlette import ServerSentEvent
 
-    return EventSourceResponse(generator)
+event = ServerSentEvent(
+    data="Custom message",
+    event="notification", 
+    id="msg-123",
+    retry=5000
+)
 ```
 
-Instead, ensure you create sessions within the generator itself
+## Advanced Usage
+
+### Custom Ping Configuration
 
 ```python
-# ✅ This is safe
-async def good_route():
-    async def generator():
-        async with AsyncSession() as session:
-            async for row in session.execute(select(User)):
-                yield dict(data=row)
+from sse_starlette import ServerSentEvent
 
-    return EventSourceResponse(generator)
-```
+def custom_ping():
+    return ServerSentEvent(comment="Custom ping message")
 
-## Special use cases
-### Customize Ping
-By default, the server sends a ping every 15 seconds. You can customize this by:
-1. setting the `ping` parameter
-2. by changing the `ping` event to a comment event so that it is not visible to the client
-```python
-@router.get("")
-async def handle():
-    generator = numbers(1, 100)
-    return EventSourceResponse(
-        generator,
-        headers={"Server": "nini"},
-        ping=5,
-        ping_message_factory=lambda: ServerSentEvent(**{"comment": "You can't see\r\nthis ping"}),
-    )
-```
-### SSE Send Timeout
-To avoid 'hanging' connections in case HTTP connection from a certain client was kept open, but the client
-stopped reading from the connection you can specifiy a send timeout (see
-[#89](https://github.com/sysid/sse-starlette/issues/89)).
-```python
-EventSourceResponse(..., send_timeout=5)  # terminate hanging send call after 5s
-```
-
-### Fan out Proxies
-Fan out proxies usually rely on response being cacheable. To support that, you can set the value of `Cache-Control`.
-For example:
-```python
 return EventSourceResponse(
-        generator(), headers={"Cache-Control": "public, max-age=29"}
-    )
+    generate_events(),
+    ping=10,  # Ping every 10 seconds
+    ping_message_factory=custom_ping
+)
 ```
-### Error Handling
-See example: `examples/error_handling.py`
 
-### Sending Responses without Async Generators
-Async generators can expose tricky error and cleanup behavior especially when they are interrupted.
-
-[Background: Cleanup in async generators](https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#cleanup-in-generators-and-async-generators).
-
-Example [`no_async_generators.py`](https://github.com/sysid/sse-starlette/pull/56#issue-1704495339) shows an alternative implementation
-that does not rely on async generators but instead uses memory channels (`examples/no_async_generators.py`).
-
-### Using pytest to test SSE Endpoints
-When testing more than a single SSE endpoint via pytest, one may encounter the following error: `RuntimeError: <asyncio.locks.Event object at 0xxxx [unset]> is bound to a different event loop`.
-
-A workaround to fix this error is to use the following fixture on all tests that use SSE:
+### Database Streaming (Thread-Safe)
 
 ```python
+async def stream_database_results(request):
+    # CORRECT: Create session within generator context
+    async with AsyncSession() as session:
+        results = await session.execute(select(User))
+        for row in results:
+            if await request.is_disconnected():
+                break
+            yield {"data": row.name, "id": str(row.id)}
+
+return EventSourceResponse(stream_database_results(request))
+```
+
+### Error Handling and Timeouts
+
+```python
+async def robust_stream(request):
+    try:
+        for i in range(100):
+            if await request.is_disconnected():
+                break
+            yield {"data": f"Item {i}"}
+            await asyncio.sleep(0.5)
+    except asyncio.CancelledError:
+        # Client disconnected - perform cleanup
+        raise
+
+return EventSourceResponse(
+    robust_stream(request),
+    send_timeout=30,  # Timeout hanging sends
+    headers={"Cache-Control": "no-cache"}
+)
+```
+
+### Memory Channels Alternative
+
+For complex data flows, use memory channels instead of generators:
+
+```python
+import anyio
+from functools import partial
+
+async def data_producer(send_channel):
+    async with send_channel:
+        for i in range(10):
+            await send_channel.send({"data": f"Item {i}"})
+            await anyio.sleep(1)
+
+async def channel_endpoint(request):
+    send_channel, receive_channel = anyio.create_memory_object_stream(10)
+    
+    return EventSourceResponse(
+        receive_channel,
+        data_sender_callable=partial(data_producer, send_channel)
+    )
+```
+
+## Configuration Options
+
+### EventSourceResponse Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `content` | `ContentStream` | Required | Async generator or iterable |
+| `ping` | `int` | 15 | Ping interval in seconds |
+| `sep` | `str` | `"\r\n"` | Line separator (`\r\n`, `\r`, `\n`) |
+| `send_timeout` | `float` | `None` | Send operation timeout |
+| `headers` | `dict` | `None` | Additional HTTP headers |
+| `ping_message_factory` | `Callable` | `None` | Custom ping message creator |
+
+### Client Disconnection
+
+```python
+async def monitored_stream(request):
+    events_sent = 0
+    try:
+        while events_sent < 100:
+            if await request.is_disconnected():
+                print(f"Client disconnected after {events_sent} events")
+                break
+            
+            yield {"data": f"Event {events_sent}"}
+            events_sent += 1
+            await asyncio.sleep(1)
+            
+    except asyncio.CancelledError:
+        print("Stream cancelled")
+        raise
+```
+
+## Testing
+
+When testing SSE endpoints with pytest, reset the global event state:
+
+```python
+import pytest
+from sse_starlette.sse import AppStatus
+
 @pytest.fixture
-def reset_sse_starlette_appstatus_event():
-    """
-    Fixture that resets the appstatus event in the sse_starlette app.
-
-    Should be used on any test that uses sse_starlette to stream events.
-    """
-    # See https://github.com/sysid/sse-starlette/issues/59
-    from sse_starlette.sse import AppStatus
-
+def reset_sse_app_status():
+    AppStatus.should_exit_event = None
+    yield
     AppStatus.should_exit_event = None
 ```
 
-For details, see [Issue#59](https://github.com/sysid/sse-starlette/issues/59#issuecomment-1961678665).
+## Production Considerations
 
-## Development, Contributing
-1. install pdm: `pip install pdm`
-2. install dependencies using pipenv: `pdm install -d`.
-3. To run tests:
+### Performance Limits
 
-### Makefile
-- make sure your virtualenv is active
-- check `Makefile` for available commands and development support, e.g. run the unit tests:
-```shell
-make test
-make tox
+- **Memory**: Each connection maintains a buffer. Monitor memory usage.
+- **Connections**: Limited by system file descriptors and application design.
+- **Network**: High-frequency events can saturate bandwidth.
+
+### Error Recovery
+
+Implement client-side reconnection logic:
+
+```javascript
+function createEventSource(url) {
+    const eventSource = new EventSource(url);
+    
+    eventSource.onerror = function() {
+        setTimeout(() => {
+            createEventSource(url);  // Reconnect after delay
+        }, 5000);
+    };
+    
+    return eventSource;
+}
 ```
 
-For integration testing you can use the provided examples in `tests` and `examples`.
+## Learning Resources
+
+### Examples Directory
+
+The `examples/` directory contains production-ready patterns:
+
+- **`01_basic_sse.py`**: Fundamental SSE concepts
+- **`02_message_broadcasting.py`**: Multi-client message distribution  
+- **`03_database_streaming.py`**: Thread-safe database integration
+- **`04_advanced_features.py`**: Custom protocols and error handling
+
+### Demonstrations Directory  
+
+The `examples/demonstrations/` directory provides educational scenarios:
+
+**Basic Patterns** (`basic_patterns/`):
+- Client disconnect detection and cleanup
+- Graceful server shutdown behavior
+
+**Production Scenarios** (`production_scenarios/`):
+- Load testing with concurrent clients
+- Network interruption handling
+
+**Advanced Patterns** (`advanced_patterns/`):
+- Memory channels vs generators
+- Error recovery and circuit breakers
+- Custom protocol development
+
+Run any demonstration:
+```bash
+python examples/demonstrations/basic_patterns/client_disconnect.py
+python examples/demonstrations/production_scenarios/load_simulations.py
+python examples/demonstrations/advanced_patterns/error_recovery.py
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"RuntimeError: Event object bound to different event loop"**
+- Reset `AppStatus.should_exit_event = None` between tests
+
+**Database session errors with async generators**
+- Create database sessions inside generators, not as dependencies
+
+**Hanging connections after client disconnect**  
+- Always check `await request.is_disconnected()` in loops
+- Use `send_timeout` parameter to detect dead connections
 
 If you are using Postman, please see: https://github.com/sysid/sse-starlette/issues/47#issuecomment-1445953826
 
+### Performance Optimization
+
+```python
+# Connection limits
+class ConnectionLimiter:
+    def __init__(self, max_connections=100):
+        self.semaphore = asyncio.Semaphore(max_connections)
+    
+    async def limited_endpoint(self, request):
+        async with self.semaphore:
+            return EventSourceResponse(generate_events())
+```
+
+## Contributing
+
+See examples and demonstrations for implementation patterns. Run tests with:
+
+```bash
+make test-unit  # Unit tests only
+make test       # All tests including integration
+```
 
 <!-- Badges -->
-
 [pypi-image]: https://badge.fury.io/py/sse-starlette.svg
 [pypi-url]: https://pypi.org/project/sse-starlette/
 [build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
 [build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
 [coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/master/graph/badge.svg
 [coverage-url]: https://codecov.io/gh/sysid/sse-starlette
+

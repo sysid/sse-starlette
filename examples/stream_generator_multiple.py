@@ -36,7 +36,7 @@ _streams: List[Stream] = []
 
 
 @app.get("/sse")
-async def sse(stream: Stream = Depends()) -> EventSourceResponse:
+async def sse() -> EventSourceResponse:
     stream = Stream()
     _streams.append(stream)
     return EventSourceResponse(stream)

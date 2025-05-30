@@ -1,3 +1,4 @@
+# Todo: rework this file, it is not up to date
 # Smoke and Integration tests
 
 ## Test for lost client connection:
