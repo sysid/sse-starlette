@@ -1,5 +1,6 @@
 import io
 import re
+import json
 from typing import Optional, Any, Union
 
 
@@ -56,6 +57,32 @@ class ServerSentEvent:
 
         buffer.write(self._sep)
         return buffer.getvalue().encode("utf-8")
+
+
+class JSONServerSentEvent(ServerSentEvent):
+    """
+    Helper class to format JSON data for Server-Sent Events (SSE).
+    """
+
+    def __init__(
+        self,
+        data: Optional[Any] = None,
+        *args,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            json.dumps(
+                data,
+                ensure_ascii=False,
+                allow_nan=False,
+                indent=None,
+                separators=(",", ":"),
+            )
+            if data is not None
+            else None,
+            *args,
+            **kwargs,
+        )
 
 
 def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> bytes:

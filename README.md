@@ -81,6 +81,18 @@ event = ServerSentEvent(
 )
 ```
 
+### JSONServerSentEvent
+
+For an easy way to send json data as SSE events:
+
+```python
+from sse_starlette import JSONServerSentEvent
+
+event = JSONServerSentEvent(
+    data={"field":"value"}, # Anything serializable with json.dumps
+)
+```
+
 ## Advanced Usage
 
 ### Custom Ping Configuration
