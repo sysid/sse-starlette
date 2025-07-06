@@ -65,7 +65,6 @@ def test_server_sent_event(input, expected):
     ],
 )
 def test_json_server_sent_event(input, expected):
-    print(input, expected)
     assert JSONServerSentEvent(**input).encode() == expected
 
 
@@ -78,7 +77,6 @@ def test_json_server_sent_event(input, expected):
     ],
 )
 def test_ensure_bytes(input, expected):
-    print(input, expected)
     assert ensure_bytes(input, sep="\n") == expected
 
 

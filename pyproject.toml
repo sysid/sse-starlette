@@ -3,7 +3,7 @@ name = "sse-starlette"
 version = "2.4.0"
 description = "SSE plugin for Starlette"
 readme = "README.md"
-license = {text = "BSD-3-Clause"}
+license = "BSD-3-Clause"
 requires-python = ">=3.9"
 authors = [
     { name = "sysid", email = "sysid@gmx.de" },
@@ -12,7 +12,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
