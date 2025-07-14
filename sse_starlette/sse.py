@@ -87,6 +87,7 @@ class EventSourceResponse(Response):
         client_close_handler_callable: Optional[
             Callable[[Message], Awaitable[None]]
         ] = None,
+        interrupt_on_exit: Optional[bool] = True,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -104,6 +105,7 @@ class EventSourceResponse(Response):
         self.background = background
         self.data_sender_callable = data_sender_callable
         self.send_timeout = send_timeout
+        self.interrupt_on_exit = interrupt_on_exit
 
         # Build SSE-specific headers.
         _headers = MutableHeaders()
@@ -242,7 +244,8 @@ class EventSourceResponse(Response):
 
             task_group.start_soon(cancel_on_finish, lambda: self._stream_response(send))
             task_group.start_soon(cancel_on_finish, lambda: self._ping(send))
-            task_group.start_soon(cancel_on_finish, self._listen_for_exit_signal)
+            if self.interrupt_on_exit:
+                task_group.start_soon(cancel_on_finish, self._listen_for_exit_signal)
 
             if self.data_sender_callable:
                 task_group.start_soon(self.data_sender_callable)
