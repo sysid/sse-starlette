@@ -1,6 +1,6 @@
 [project]
 name = "sse-starlette"
-version = "2.4.1"
+version = "3.0.0"
 description = "SSE plugin for Starlette"
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -70,7 +70,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.bumpversion]
-current_version = "2.4.1"
+current_version = "3.0.0"
 commit = true
 tag = false
 message = "Bump version to {new_version}"
