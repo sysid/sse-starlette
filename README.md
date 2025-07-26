@@ -48,6 +48,8 @@ app = Starlette(routes=[Route("/events", sse_endpoint)])
 - **Async/Await**: Built on modern Python async patterns
 - **Connection Management**: Automatic client disconnect detection
 - **Graceful Shutdown**: Proper cleanup on server termination
+- **Thread Safety**: Context-local event management for multi-threaded applications
+- **Multi-Loop Support**: Works correctly with multiple asyncio event loops
 
 ## Key Components
 
@@ -108,6 +110,35 @@ return EventSourceResponse(
     ping=10,  # Ping every 10 seconds
     ping_message_factory=custom_ping
 )
+```
+
+### Multi-Threaded Usage
+
+sse-starlette now supports usage in multi-threaded applications and with multiple asyncio event loops:
+
+```python
+import threading
+import asyncio
+from sse_starlette import EventSourceResponse
+
+def run_sse_in_thread():
+    """SSE streaming works correctly in separate threads"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    async def thread_events():
+        for i in range(5):
+            yield {"data": f"Thread event {i}"}
+            await asyncio.sleep(1)
+    
+    # This works without "Event bound to different loop" errors
+    response = EventSourceResponse(thread_events())
+    loop.close()
+
+# Start SSE in multiple threads
+for i in range(3):
+    thread = threading.Thread(target=run_sse_in_thread)
+    thread.start()
 ```
 
 ### Database Streaming (Thread-Safe)
@@ -204,11 +235,12 @@ async def monitored_stream(request):
 
 ## Testing
 
-When testing SSE endpoints with pytest, reset the global event state:
+sse-starlette includes now comprehensive test isolation without manual setup. The library automatically handles event loop contexts, eliminating the need for manual state resets:
 
 ```python
+# this is deprecated and not needed since version 3.0.0
 import pytest
-from sse_starlette.sse import AppStatus
+from sse_starlette import EventSourceResponse
 
 @pytest.fixture
 def reset_sse_app_status():
@@ -281,9 +313,6 @@ python examples/demonstrations/advanced_patterns/error_recovery.py
 ## Troubleshooting
 
 ### Common Issues
-
-**"RuntimeError: Event object bound to different event loop"**
-- Reset `AppStatus.should_exit_event = None` between tests
 
 **Database session errors with async generators**
 - Create database sessions inside generators, not as dependencies
