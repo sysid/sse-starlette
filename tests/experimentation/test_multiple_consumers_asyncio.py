@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, List
 import pytest
@@ -50,7 +49,7 @@ class ServerManager:
         self._server_task = asyncio.create_task(self.server.serve())
 
         try:
-            async with timeout(10) as timeout_ctx:  # 10 second timeout for startup
+            async with timeout(10):  # 10 second timeout for startup
                 await self._startup_complete.wait()
 
                 # Additional health check

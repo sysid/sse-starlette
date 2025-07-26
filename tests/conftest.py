@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
@@ -12,7 +13,6 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from sse_starlette import EventSourceResponse
-from sse_starlette.sse import AppStatus
 
 _log = logging.getLogger(__name__)
 log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s"
@@ -33,10 +33,12 @@ def anyio_backend():
 
 @pytest.fixture
 async def app():
-    async def startup():
+    @asynccontextmanager
+    async def lifespan(app):
+        # Startup
         _log.debug("Starting up")
-
-    async def shutdown():
+        yield
+        # Shutdown  
         _log.debug("Shutting down")
 
     async def home():
@@ -61,8 +63,7 @@ async def app():
 
     app = Starlette(
         routes=[Route("/", home), Route("/endless", endpoint=endless)],
-        on_startup=[startup],
-        on_shutdown=[shutdown],
+        lifespan=lifespan,
     )
 
     async with LifespanManager(app):
@@ -72,13 +73,7 @@ async def app():
 
 
 @pytest.fixture
-def reset_appstatus_event():
-    # avoid: RuntimeError: <asyncio.locks.Event object at 0x1046a0a30 [unset]> is bound to a different event loop
-    AppStatus.should_exit_event = None
-
-
-@pytest.fixture
-async def httpx_client(reset_appstatus_event, app):
+async def httpx_client(app):
     transport = ASGITransport(app=app)
 
     async with httpx.AsyncClient(
@@ -89,7 +84,7 @@ async def httpx_client(reset_appstatus_event, app):
 
 
 @pytest.fixture
-def client(reset_appstatus_event, app):
+def client(app):
     with TestClient(app=app, base_url="http://localhost:8000") as client:
         print("Yielding Client")
         yield client

@@ -1,3 +1,4 @@
+import contextvars
 import logging
 from datetime import datetime, timezone
 from typing import (
@@ -24,6 +25,11 @@ from sse_starlette.event import ServerSentEvent, ensure_bytes
 
 logger = logging.getLogger(__name__)
 
+# Context variable for exit events per event loop
+_exit_event_context: contextvars.ContextVar[Optional[anyio.Event]] = (
+    contextvars.ContextVar("exit_event", default=None)
+)
+
 
 class SendTimeoutError(TimeoutError):
     pass
@@ -33,17 +39,29 @@ class AppStatus:
     """Helper to capture a shutdown signal from Uvicorn so we can gracefully terminate SSE streams."""
 
     should_exit = False
-    should_exit_event: Union[anyio.Event, None] = None
-    original_handler = None
+    original_handler: Optional[Callable] = None
 
     @staticmethod
     def handle_exit(*args, **kwargs):
-        # Mark that the app should exit, and signal all waiters.
+        # Mark that the app should exit, and signal all waiters in all contexts.
         AppStatus.should_exit = True
-        if AppStatus.should_exit_event is not None:
-            AppStatus.should_exit_event.set()
+
+        # Signal the event in current context if it exists
+        current_event = _exit_event_context.get(None)
+        if current_event is not None:
+            current_event.set()
+
         if AppStatus.original_handler is not None:
             AppStatus.original_handler(*args, **kwargs)
+
+    @staticmethod
+    def get_or_create_exit_event() -> anyio.Event:
+        """Get or create an exit event for the current context."""
+        event = _exit_event_context.get(None)
+        if event is None:
+            event = anyio.Event()
+            _exit_event_context.set(event)
+        return event
 
 
 try:
@@ -191,14 +209,14 @@ class EventSourceResponse(Response):
         if AppStatus.should_exit:
             return
 
-        if AppStatus.should_exit_event is None:
-            AppStatus.should_exit_event = anyio.Event()
+        # Get or create context-local exit event
+        exit_event = AppStatus.get_or_create_exit_event()
 
         # Check if should_exit got set while we set up the event
         if AppStatus.should_exit:
             return
 
-        await AppStatus.should_exit_event.wait()
+        await exit_event.wait()
 
     async def _ping(self, send: Send) -> None:
         """Periodically send ping messages to keep the connection alive on proxies.

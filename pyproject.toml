@@ -99,6 +99,7 @@ markers = [
     "experimentation: marks tests as experimental tests, not to be run in CICD"
 ]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 #addopts = "--cov=my_package --cov-report=term-missing"
 
 [tool.mypy]

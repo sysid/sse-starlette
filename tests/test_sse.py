@@ -49,7 +49,6 @@ class TestEventSourceResponse:
     )
     async def test_response_send_whenValidInput_thenGeneratesExpectedOutput(
         self,
-        reset_appstatus_event,
         mock_generator,
         input_type,
         separator,
@@ -93,7 +92,7 @@ class TestEventSourceResponse:
         ],
     )
     def test_eventSourceResponse_whenUsingMemoryChannel_thenHandlesAsyncQueueCorrectly(
-        self, reset_appstatus_event, producer_output, expected_sse_response
+        self, producer_output, expected_sse_response
     ):
         """Tests that EventSourceResponse can properly consume data from an async memory channel.
 
@@ -169,9 +168,7 @@ class TestEventSourceResponse:
                     assert "Disconnected from client" in caplog.text
 
     @pytest.mark.anyio
-    async def test_send_whenTimeoutOccurs_thenRaisesSendTimeoutError(
-        self, reset_appstatus_event
-    ):
+    async def test_send_whenTimeoutOccurs_thenRaisesSendTimeoutError(self):
         # Arrange
         # Send timeout is set to 0.5s, but `send` will take 1s. Expect SendTimeoutError.
         cleanup_executed = False
@@ -220,9 +217,7 @@ class TestEventSourceResponse:
         assert headers["x-custom-header"] == "custom-value"
         assert headers["content-type"] == "text/event-stream; charset=utf-8"
 
-    def test_headers_whenCreated_thenHasCorrectCharset(
-        self, reset_appstatus_event, mock_generator
-    ):
+    def test_headers_whenCreated_thenHasCorrectCharset(self, mock_generator):
         # Arrange
         generator = mock_generator(1, 5)
 
@@ -240,9 +235,7 @@ class TestEventSourceResponse:
         assert header_value == "text/event-stream; charset=utf-8"
 
     @pytest.mark.anyio
-    async def test_ping_whenConcurrentWithEvents_thenRespectsLocking(
-        self, reset_appstatus_event
-    ):
+    async def test_ping_whenConcurrentWithEvents_thenRespectsLocking(self):
         # Sequencing here is as follows to reproduce race condition:
         # t=0.5s - event_publisher sends the first response item,
         #          claiming the lock and going to sleep for 1 second so until t=1.5s.
@@ -334,9 +327,7 @@ class TestEventSourceResponse:
         assert result == expected.encode()
 
     @pytest.mark.anyio
-    async def test_backgroundTask_whenProvided_thenExecutesAfterResponse(
-        self, reset_appstatus_event
-    ):
+    async def test_backgroundTask_whenProvided_thenExecutesAfterResponse(self):
         # Arrange
         task_executed = False
 
