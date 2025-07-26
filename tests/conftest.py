@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
@@ -32,10 +33,12 @@ def anyio_backend():
 
 @pytest.fixture
 async def app():
-    async def startup():
+    @asynccontextmanager
+    async def lifespan(app):
+        # Startup
         _log.debug("Starting up")
-
-    async def shutdown():
+        yield
+        # Shutdown  
         _log.debug("Shutting down")
 
     async def home():
@@ -60,8 +63,7 @@ async def app():
 
     app = Starlette(
         routes=[Route("/", home), Route("/endless", endpoint=endless)],
-        on_startup=[startup],
-        on_shutdown=[shutdown],
+        lifespan=lifespan,
     )
 
     async with LifespanManager(app):
