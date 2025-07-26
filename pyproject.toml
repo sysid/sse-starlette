@@ -28,7 +28,7 @@ dependencies = [
 examples = [
     "uvicorn>=0.34.0",
     "fastapi>=0.115.12",
-    "sqlalchemy[asyncio,examples]>=2.0.41",
+    "sqlalchemy[asyncio]>=2.0.41",
     "starlette>=0.41.3",
     "aiosqlite>=0.21.0",
 ]
@@ -55,8 +55,10 @@ dev = [
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.8.4",
+    "starlette>=0.41.3",
     "tenacity>=9.0.0",
     "testcontainers>=4.9.0",
+    "uvicorn>=0.34.0",
     "build>=1.2.2.post1",
 ]
 
