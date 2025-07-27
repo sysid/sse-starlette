@@ -46,7 +46,6 @@ daphne = [
 dev = [
     "asgi-lifespan>=2.1.0",
     "async-timeout>=5.0.1",
-    "codecov>=2.1.13",
     "httpx>=0.28.1",
     "mypy>=1.14.0",
     "portend>=3.2.0",

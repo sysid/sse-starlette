@@ -3,7 +3,6 @@
 [![Downloads](https://static.pepy.tech/badge/sse-starlette/week)](https://pepy.tech/project/sse-starlette)
 [![PyPI Version][pypi-image]][pypi-url]
 [![Build Status][build-image]][build-url]
-[![Code Coverage][coverage-image]][coverage-url]
 
 > Background: https://sysid.github.io/server-sent-events/
 
@@ -351,5 +350,5 @@ make test       # All tests including integration
 [build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
 [build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
 [coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/master/graph/badge.svg
-[coverage-url]: https://codecov.io/gh/sysid/sse-starlette
+<!--[coverage-url]: https://codecov.io/gh/sysid/sse-starlette-->
 
