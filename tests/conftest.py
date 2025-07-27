@@ -38,7 +38,7 @@ async def app():
         # Startup
         _log.debug("Starting up")
         yield
-        # Shutdown  
+        # Shutdown
         _log.debug("Shutting down")
 
     async def home():

@@ -100,9 +100,6 @@ test-docker:  ## test-docker (docker desktop: advanced settings)
 		echo "Skipping tests: /var/run/docker.sock does not exist."; \
 	fi
 
-.PHONY: tox
-tox:   ## Run tox
-	tox
 
 ################################################################################
 # Code Quality \

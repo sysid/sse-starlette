@@ -4,5 +4,4 @@ include README.md
 
 global-include *.typed
 
-prune .tox
 prune .venv
