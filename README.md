@@ -335,6 +335,43 @@ class ConnectionLimiter:
             return EventSourceResponse(generate_events())
 ```
 
+## Network-Level Gotchas
+
+Network infrastructure components can buffer SSE streams, breaking real-time delivery. Here are the most common issues and solutions:
+
+### Reverse Proxy Buffering (Nginx/Apache)
+
+**Problem**: Nginx buffers responses by default, delaying SSE events until ~16KB accumulates.
+
+**Solution**: Add the `X-Accel-Buffering: no` header.
+
+**Nginx Configuration** (if you can't modify app headers):
+```nginx
+location /events {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Connection '';
+    proxy_buffering off;           # Disable for this location
+    chunked_transfer_encoding off;
+}
+```
+
+### CDN Issues
+
+**Cloudflare**: Buffers ~100KB before flushing to clients, breaking real-time delivery.
+**Akamai**: Edge servers buffer by default.
+
+### Load Balancer Problems
+
+**HAProxy**: Timeout settings must exceed heartbeat frequency.
+```haproxy
+# Ensure timeouts > ping interval
+timeout client 60s    # If ping every 45s
+timeout server 60s
+```
+
+**F5 Load Balancers**: Buffer responses by default.
+
 ## Contributing
 
 See examples and demonstrations for implementation patterns. Run tests with:
