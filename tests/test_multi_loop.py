@@ -1,5 +1,8 @@
 """
-Tests for multi-loop and thread safety scenarios to verify Issue #140 fix.
+Tests for multi-loop and thread safety scenarios.
+
+- Issue #140: Multi-loop safety (context isolation)
+- Issue #149: handle_exit cannot signal context-local events
 """
 
 import asyncio
@@ -194,3 +197,119 @@ class TestMultiLoopSafety:
             assert new_event is not None
         finally:
             loop2.close()
+
+
+class TestIssue149HandleExitSignaling:
+    """
+    Tests for Issue #149: handle_exit cannot signal context-local events.
+
+    Unlike TestMultiLoopSafety tests which set should_exit=True BEFORE waiting,
+    these tests exercise the actual signaling path where tasks are ALREADY
+    waiting when handle_exit is called.
+    """
+
+    def setup_method(self):
+        AppStatus.should_exit = False
+
+    def teardown_method(self):
+        AppStatus.should_exit = False
+
+    @pytest.mark.asyncio
+    async def test_handle_exit_wakes_waiting_task(self):
+        """
+        Test that handle_exit() can wake a task already waiting on exit_event.
+
+        This is the critical path: task waits, THEN signal arrives.
+        Bug: handle_exit runs in different context, can't see task's event.
+        """
+        task_exited = asyncio.Event()
+
+        async def wait_for_exit():
+            await EventSourceResponse._listen_for_exit_signal()
+            task_exited.set()
+
+        task = asyncio.create_task(wait_for_exit())
+        await asyncio.sleep(0.1)  # Let task enter wait state
+
+        # Temporarily disable original handler to avoid uvicorn dependency
+        original = AppStatus.original_handler
+        AppStatus.original_handler = None
+        try:
+            AppStatus.handle_exit()
+        finally:
+            AppStatus.original_handler = original
+
+        try:
+            await asyncio.wait_for(task_exited.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            pytest.fail(
+                "handle_exit() failed to wake waiting task. "
+                "Issue #149: context variables prevent cross-context signaling."
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_exit_wakes_multiple_waiting_tasks(self):
+        """Test that handle_exit() wakes ALL waiting tasks, not just one."""
+        num_tasks = 3
+        exited = []
+
+        async def wait_for_exit(task_id: int):
+            await EventSourceResponse._listen_for_exit_signal()
+            exited.append(task_id)
+
+        tasks = [asyncio.create_task(wait_for_exit(i)) for i in range(num_tasks)]
+        await asyncio.sleep(0.1)  # Let all tasks enter wait state
+
+        # Temporarily disable original handler to avoid uvicorn dependency
+        original = AppStatus.original_handler
+        AppStatus.original_handler = None
+        try:
+            AppStatus.handle_exit()
+        finally:
+            AppStatus.original_handler = original
+
+        done, pending = await asyncio.wait(tasks, timeout=1.0)
+
+        for t in pending:
+            t.cancel()
+
+        if len(exited) != num_tasks:
+            pytest.fail(
+                f"Only {len(exited)}/{num_tasks} tasks woke up. "
+                f"Issue #149: handle_exit cannot signal all context-local events."
+            )
+
+    def test_handle_exit_sees_no_event_in_its_context(self):
+        """
+        Directly verify that handle_exit's context has no exit event.
+
+        This is the root cause: _exit_event_context.get(None) returns None
+        in handle_exit because the event was created in a different context.
+        """
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            # Create event in task context (simulates SSE task)
+            async def create_event():
+                return AppStatus.get_or_create_exit_event()
+
+            task_event = loop.run_until_complete(create_event())
+            assert task_event is not None
+
+            # Check what handle_exit would see (its context)
+            handler_sees = _exit_event_context.get(None)
+
+            if handler_sees is None:
+                pytest.fail(
+                    "handle_exit's context has no exit event. "
+                    "_exit_event_context.get(None) = None. "
+                    "This is Issue #149: task's event is invisible to handle_exit."
+                )
+
+            assert handler_sees is task_event
+        finally:
+            loop.close()
