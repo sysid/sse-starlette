@@ -1,7 +1,7 @@
 from time import sleep
 
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 
 # Define a simple container
@@ -24,12 +24,14 @@ class BasicContainer(DockerContainer):
             f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level debug"
         )
 
+        # Wait for server to be ready (applied during start())
+        self.waiting_for(LogMessageWaitStrategy("Application startup complete"))
+
 
 if __name__ == "__main__":
     # Start the container
     container = BasicContainer()
     with container:
-        wait_for_logs(container, "Application startup complete", timeout=10)
         print(f"Container is running. ID: {container._container.id}")
         print(
             f"Exec into the container using: docker exec -it {container._container.id} sh"

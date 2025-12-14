@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Internet :: WWW/HTTP",
 ]
 dependencies = [
@@ -101,6 +102,10 @@ markers = [
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # testcontainers internal deprecation warning (triggered at import time by their own code)
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning",
+]
 #addopts = "--cov=my_package --cov-report=term-missing"
 
 [tool.mypy]

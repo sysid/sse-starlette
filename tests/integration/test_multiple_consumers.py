@@ -4,7 +4,7 @@ import logging
 import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 _log = logging.getLogger(__name__)
 
@@ -25,6 +25,9 @@ class SSEServerContainer(DockerContainer):
 
         # Expose the port
         self.with_exposed_ports(8000)
+
+        # Wait for server to be ready (applied during start())
+        self.waiting_for(LogMessageWaitStrategy("Application startup complete"))
 
 
 async def consume_events(url: str, expected_lines: int = 2):
@@ -60,9 +63,6 @@ async def test_sse_server_termination(caplog, app_path, expected_lines):
     container.start()
 
     try:
-        # Wait for server to be ready
-        wait_for_logs(container, "Application startup complete", timeout=10)
-
         port = container.get_exposed_port(8000)
         url = f"http://localhost:{port}/endless"
 

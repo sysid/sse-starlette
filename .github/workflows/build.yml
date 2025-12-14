@@ -14,17 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9, '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
 
     env:
       USING_COVERAGE: '3.10'
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
