@@ -1,6 +1,7 @@
 import asyncio
 import contextvars
 import logging
+import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import (
@@ -51,16 +52,51 @@ def _get_shutdown_state() -> _ShutdownState:
     return state
 
 
+def _get_uvicorn_server():
+    """
+    Try to get uvicorn Server instance via signal handler introspection.
+
+    When uvicorn registers signal handlers, they're bound methods on the Server instance.
+    We can retrieve the Server from the handler's __self__ attribute.
+
+    Returns None if:
+    - Not running under uvicorn
+    - Signal handler isn't a bound method
+    - Any introspection fails
+    """
+    try:
+        handler = signal.getsignal(signal.SIGTERM)
+        if hasattr(handler, "__self__"):
+            server = handler.__self__
+            if hasattr(server, "should_exit"):
+                return server
+    except Exception:
+        pass
+    return None
+
+
 async def _shutdown_watcher() -> None:
     """
     Poll for shutdown and broadcast to all events in this context.
 
-    One watcher runs per event loop. When AppStatus.should_exit becomes True,
-    it signals all registered events, waking waiting tasks.
+    One watcher runs per event loop. Checks two shutdown sources:
+    1. AppStatus.should_exit - set when our monkey-patch works
+    2. uvicorn Server.should_exit - via signal handler introspection (Issue #132 fix)
+
+    When either becomes True, signals all registered events.
     """
     state = _get_shutdown_state()
+    uvicorn_server = _get_uvicorn_server()
+
     try:
-        while not AppStatus.should_exit:
+        while True:
+            # Check our flag (monkey-patch worked)
+            if AppStatus.should_exit:
+                break
+            # Check uvicorn's flag directly (monkey-patch failed - Issue #132)
+            if uvicorn_server is not None and uvicorn_server.should_exit:
+                AppStatus.should_exit = True  # Sync state for consistency
+                break
             await anyio.sleep(0.5)
 
         # Shutdown detected - broadcast to all waiting events
