@@ -1,5 +1,7 @@
+import asyncio
 import contextvars
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import (
     Any,
@@ -10,6 +12,7 @@ from typing import (
     Iterator,
     Mapping,
     Optional,
+    Set,
     Union,
 )
 
@@ -25,10 +28,60 @@ from sse_starlette.event import ServerSentEvent, ensure_bytes
 
 logger = logging.getLogger(__name__)
 
-# Context variable for exit events per event loop
-_exit_event_context: contextvars.ContextVar[Optional[anyio.Event]] = (
-    contextvars.ContextVar("exit_event", default=None)
+@dataclass
+class _ShutdownState:
+    """Per-event-loop state for shutdown coordination."""
+
+    events: Set[anyio.Event] = field(default_factory=set)
+    watcher_started: bool = False
+
+
+# Each event loop gets its own shutdown state
+_shutdown_state: contextvars.ContextVar[Optional[_ShutdownState]] = (
+    contextvars.ContextVar("shutdown_state", default=None)
 )
+
+
+def _get_shutdown_state() -> _ShutdownState:
+    """Get or create shutdown state for the current context."""
+    state = _shutdown_state.get()
+    if state is None:
+        state = _ShutdownState()
+        _shutdown_state.set(state)
+    return state
+
+
+async def _shutdown_watcher() -> None:
+    """
+    Poll for shutdown and broadcast to all events in this context.
+
+    One watcher runs per event loop. When AppStatus.should_exit becomes True,
+    it signals all registered events, waking waiting tasks.
+    """
+    state = _get_shutdown_state()
+    try:
+        while not AppStatus.should_exit:
+            await anyio.sleep(0.5)
+
+        # Shutdown detected - broadcast to all waiting events
+        for event in list(state.events):
+            event.set()
+    finally:
+        # Allow watcher to be restarted if loop is reused
+        state.watcher_started = False
+
+
+def _ensure_watcher_started_on_this_loop() -> None:
+    """Ensure the shutdown watcher is running for this event loop."""
+    state = _get_shutdown_state()
+    if not state.watcher_started:
+        state.watcher_started = True
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_shutdown_watcher())
+        except RuntimeError:
+            # No running loop - shouldn't happen in normal use
+            state.watcher_started = False
 
 
 class SendTimeoutError(TimeoutError):
@@ -43,25 +96,9 @@ class AppStatus:
 
     @staticmethod
     def handle_exit(*args, **kwargs):
-        # Mark that the app should exit, and signal all waiters in all contexts.
         AppStatus.should_exit = True
-
-        # Signal the event in current context if it exists
-        current_event = _exit_event_context.get(None)
-        if current_event is not None:
-            current_event.set()
-
         if AppStatus.original_handler is not None:
             AppStatus.original_handler(*args, **kwargs)
-
-    @staticmethod
-    def get_or_create_exit_event() -> anyio.Event:
-        """Get or create an exit event for the current context."""
-        event = _exit_event_context.get(None)
-        if event is None:
-            event = anyio.Event()
-            _exit_event_context.set(event)
-        return event
 
 
 try:
@@ -204,19 +241,23 @@ class EventSourceResponse(Response):
 
     @staticmethod
     async def _listen_for_exit_signal() -> None:
-        """Watch for shutdown signals (e.g. SIGINT, SIGTERM) so we can break the event loop."""
-        # Check if should_exit was set before anybody started waiting
+        """Wait for shutdown signal via the shared watcher."""
         if AppStatus.should_exit:
             return
 
-        # Get or create context-local exit event
-        exit_event = AppStatus.get_or_create_exit_event()
+        _ensure_watcher_started_on_this_loop()
 
-        # Check if should_exit got set while we set up the event
-        if AppStatus.should_exit:
-            return
+        state = _get_shutdown_state()
+        event = anyio.Event()
+        state.events.add(event)
 
-        await exit_event.wait()
+        try:
+            # Double-check after registration
+            if AppStatus.should_exit:
+                return
+            await event.wait()
+        finally:
+            state.events.discard(event)
 
     async def _ping(self, send: Send) -> None:
         """Periodically send ping messages to keep the connection alive on proxies.

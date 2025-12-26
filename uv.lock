@@ -829,7 +829,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload_time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -1259,7 +1259,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload_time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -2107,10 +2107,12 @@ asyncio = [
 
 [[package]]
 name = "sse-starlette"
-version = "3.0.3"
+version = "3.0.4"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
+    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "starlette", version = "0.50.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
 
 [package.optional-dependencies]
@@ -2121,8 +2123,6 @@ examples = [
     { name = "aiosqlite" },
     { name = "fastapi" },
     { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "starlette", version = "0.50.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "uvicorn" },
 ]
 granian = [
@@ -2164,7 +2164,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'examples'", specifier = ">=0.115.12" },
     { name = "granian", marker = "extra == 'granian'", specifier = ">=2.3.1" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'examples'", specifier = ">=2.0.41" },
-    { name = "starlette", marker = "extra == 'examples'", specifier = ">=0.49.1" },
+    { name = "starlette", specifier = ">=0.49.1" },
     { name = "uvicorn", marker = "extra == 'examples'", specifier = ">=0.34.0" },
     { name = "uvicorn", marker = "extra == 'uvicorn'", specifier = ">=0.34.0" },
 ]

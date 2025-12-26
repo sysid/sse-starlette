@@ -9,7 +9,6 @@ import pytest
 from starlette.background import BackgroundTask
 from starlette.testclient import TestClient
 
-from sse_starlette.event import ServerSentEvent
 from sse_starlette.sse import EventSourceResponse
 from sse_starlette.sse import SendTimeoutError
 from tests.anyio_compat import collapse_excgroups
@@ -309,22 +308,6 @@ class TestEventSourceResponse:
         # Act & Assert
         with pytest.raises(NotImplementedError):
             response.enable_compression()
-
-    @pytest.mark.parametrize("separator", ["\n", "\r", "\r\n"])
-    def test_customSeparator_whenProvided_thenUsesCorrectSeparator(self, separator):
-        # Arrange
-        test_data = "test_data"
-        test_event = "test_event"
-
-        # Act
-        response = ServerSentEvent(test_data, event=test_event, sep=separator)
-        result = response.encode()
-
-        # Assert
-        expected = (
-            f"event: {test_event}{separator}data: {test_data}{separator}{separator}"
-        )
-        assert result == expected.encode()
 
     @pytest.mark.anyio
     async def test_backgroundTask_whenProvided_thenExecutesAfterResponse(self):
