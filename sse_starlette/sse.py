@@ -1,7 +1,7 @@
 import asyncio
-import contextvars
 import logging
 import signal
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import (
@@ -31,24 +31,26 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _ShutdownState:
-    """Per-event-loop state for shutdown coordination."""
+    """Per-thread state for shutdown coordination.
+
+    Issue #152 fix: Uses threading.local() instead of ContextVar to ensure
+    one watcher per thread rather than one per async context.
+    """
 
     events: Set[anyio.Event] = field(default_factory=set)
     watcher_started: bool = False
 
 
-# Each event loop gets its own shutdown state
-_shutdown_state: contextvars.ContextVar[Optional[_ShutdownState]] = (
-    contextvars.ContextVar("shutdown_state", default=None)
-)
+# Each thread gets its own shutdown state (one event loop per thread typically)
+_thread_state = threading.local()
 
 
 def _get_shutdown_state() -> _ShutdownState:
-    """Get or create shutdown state for the current context."""
-    state = _shutdown_state.get()
+    """Get or create shutdown state for the current thread."""
+    state = getattr(_thread_state, 'shutdown_state', None)
     if state is None:
         state = _ShutdownState()
-        _shutdown_state.set(state)
+        _thread_state.shutdown_state = state
     return state
 
 
@@ -79,7 +81,7 @@ async def _shutdown_watcher() -> None:
     """
     Poll for shutdown and broadcast to all events in this context.
 
-    One watcher runs per event loop. Checks two shutdown sources:
+    One watcher runs per thread (event loop). Checks two shutdown sources:
     1. AppStatus.should_exit - set when our monkey-patch works
     2. uvicorn Server.should_exit - via signal handler introspection (Issue #132 fix)
 
@@ -108,7 +110,7 @@ async def _shutdown_watcher() -> None:
 
 
 def _ensure_watcher_started_on_this_loop() -> None:
-    """Ensure the shutdown watcher is running for this event loop."""
+    """Ensure the shutdown watcher is running for this thread (event loop)."""
     state = _get_shutdown_state()
     if not state.watcher_started:
         state.watcher_started = True

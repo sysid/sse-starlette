@@ -1,8 +1,11 @@
 """
 Tests for multi-loop and thread safety scenarios.
 
-- Issue #140: Multi-loop safety (context isolation)
+- Issue #140: Multi-loop safety (thread isolation)
 - Issue #149: handle_exit cannot signal context-local events (FIXED via watcher)
+- Issue #152: Watcher task leak (FIXED by using threading.local instead of ContextVar)
+
+Setup/teardown handled by conftest.reset_shutdown_state fixture.
 """
 
 import asyncio
@@ -15,31 +18,23 @@ from sse_starlette.sse import (
     AppStatus,
     EventSourceResponse,
     _get_shutdown_state,
-    _shutdown_state,
 )
 
 
 class TestMultiLoopSafety:
     """Test suite for multi-loop and thread safety."""
 
-    def setup_method(self):
-        """Reset AppStatus before each test."""
-        AppStatus.should_exit = False
-        # Reset shutdown state for clean tests
-        _shutdown_state.set(None)
+    def test_same_thread_shares_state(self):
+        """Test that same thread shares shutdown state (Issue #152 fix).
 
-    def teardown_method(self):
-        """Clean up after each test."""
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
-
-    def test_context_isolation_same_thread(self):
-        """Test that shutdown state is isolated between different contexts."""
+        With threading.local, all code in the same thread shares state,
+        preventing multiple watchers from being spawned.
+        """
 
         async def get_state():
             return _get_shutdown_state()
 
-        # Run in different asyncio event loops (different contexts)
+        # Run in different asyncio event loops (still same thread)
         loop1 = asyncio.new_event_loop()
         asyncio.set_event_loop(loop1)
         try:
@@ -54,8 +49,8 @@ class TestMultiLoopSafety:
         finally:
             loop2.close()
 
-        # States from different loops should be different objects
-        assert state_a is not state_b
+        # With threading.local, same thread = same state
+        assert state_a is state_b, "Same thread should share state (Issue #152 fix)"
 
     def test_thread_isolation(self):
         """Test that shutdown state is isolated between different threads."""
@@ -96,16 +91,8 @@ class TestIssue149HandleExitSignaling:
     Tests for Issue #149: handle_exit cannot signal context-local events.
 
     Fixed by watcher pattern: a single watcher polls should_exit and
-    broadcasts to all registered events in the same async context.
+    broadcasts to all registered events in the same thread.
     """
-
-    def setup_method(self):
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
-
-    def teardown_method(self):
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
 
     @pytest.mark.asyncio
     async def test_handle_exit_wakes_waiting_task(self):
@@ -173,3 +160,27 @@ class TestIssue149HandleExitSignaling:
                 pass
 
         assert len(exited) == num_tasks, f"Only {len(exited)}/{num_tasks} tasks woke up."
+
+    @pytest.mark.asyncio
+    async def test_all_tasks_share_same_shutdown_state(self):
+        """
+        Verify that all tasks created with asyncio.create_task() in the same thread
+        share the same _ShutdownState.
+        """
+        state_ids = []
+
+        async def get_state_in_task(task_id: int):
+            state = _get_shutdown_state()
+            state_ids.append((task_id, id(state)))
+
+        # Create multiple tasks
+        tasks = [asyncio.create_task(get_state_in_task(i)) for i in range(3)]
+        await asyncio.gather(*tasks)
+
+        # Verify all tasks got the same state instance
+        unique_ids = set(state_id for _, state_id in state_ids)
+        assert len(unique_ids) == 1, (
+            f"Expected all tasks to share one state, but found {len(unique_ids)} unique states. "
+            f"This indicates threading.local is not working as expected."
+        )
+
