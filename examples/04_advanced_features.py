@@ -57,7 +57,7 @@ app.add_middleware(
 
 def create_custom_ping() -> ServerSentEvent:
     """Create a custom ping message that's invisible to the client.
-        Because it is sent as a comment.
+    Because it is sent as a comment.
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     return ServerSentEvent(comment=f"invisible ping at\r\n{timestamp}")
@@ -69,7 +69,7 @@ async def stream_with_custom_ping() -> AsyncGenerator[dict, None]:
         yield {
             "data": f"Message {i} with custom (invisible) ping",
             "id": str(i),
-            "event": "custom"
+            "event": "custom",
         }
         await asyncio.sleep(2)
 
@@ -77,9 +77,9 @@ async def stream_with_custom_ping() -> AsyncGenerator[dict, None]:
 async def stream_with_error_handling(request: Request) -> AsyncGenerator[dict, None]:
     """Stream that demonstrates error handling within the generator.
 
-        The error message can be processed on the client-side to handle the error gracefully.
-        Note the use of return after yielding the error message.
-        This will stop the generator from continuing after an error occurs.
+    The error message can be processed on the client-side to handle the error gracefully.
+    Note the use of return after yielding the error message.
+    This will stop the generator from continuing after an error occurs.
     """
     for i in range(1, 21):
         try:
@@ -92,7 +92,7 @@ async def stream_with_error_handling(request: Request) -> AsyncGenerator[dict, N
             yield {
                 "data": f"Successfully processed item {i}",
                 "id": str(i),
-                "event": "success"
+                "event": "success",
             }
             await asyncio.sleep(0.8)
 
@@ -100,23 +100,20 @@ async def stream_with_error_handling(request: Request) -> AsyncGenerator[dict, N
             logger.warning(f"Processing error: {e}")
             yield {
                 "data": f"Error: {str(e)}. Continuing with next items...",
-                "event": "error"
+                "event": "error",
             }
         except ConnectionError as e:
             logger.error(f"Connection error: {e}")
             yield {
                 "data": "Connection error occurred. Stream ending.",
-                "event": "fatal_error"
+                "event": "fatal_error",
             }
             return
 
         except Exception as e:
             # raise e
             logger.error(f"Unexpected error: {e}")
-            yield {
-                "data": "Unexpected error. Stream ending.",
-                "event": "fatal_error"
-            }
+            yield {"data": "Unexpected error. Stream ending.", "event": "fatal_error"}
 
 
 async def stream_with_custom_separator() -> AsyncGenerator[dict, None]:
@@ -125,15 +122,11 @@ async def stream_with_custom_separator() -> AsyncGenerator[dict, None]:
         "First line\nwith newlines\ninside",
         "Second message",
         "Third line\r\nwith CRLF",
-        "Final message"
+        "Final message",
     ]
 
     for i, message in enumerate(messages, 1):
-        yield {
-            "data": message,
-            "id": str(i),
-            "event": "multiline"
-        }
+        yield {"data": message, "id": str(i), "event": "multiline"}
         await asyncio.sleep(1)
 
 
@@ -145,22 +138,19 @@ def background_cleanup_task():
 @app.get("/custom-ping")
 async def custom_ping_endpoint() -> EventSourceResponse:
     """Endpoint with custom ping message and interval.
-        This examples demonstrates how to use a comment as a ping instead of sending a dedicated event type 'ping'.
+    This examples demonstrates how to use a comment as a ping instead of sending a dedicated event type 'ping'.
     """
     return EventSourceResponse(
         stream_with_custom_ping(),
         ping=3,  # Ping every 3 seconds
-        ping_message_factory=create_custom_ping
+        ping_message_factory=create_custom_ping,
     )
 
 
 @app.get("/error-demo")
 async def error_demo_endpoint(request: Request) -> EventSourceResponse:
     """Endpoint demonstrating error handling."""
-    return EventSourceResponse(
-        stream_with_error_handling(request),
-        ping=5
-    )
+    return EventSourceResponse(stream_with_error_handling(request), ping=5)
 
 
 @app.get("/custom-separator")
@@ -169,7 +159,7 @@ async def custom_separator_endpoint() -> EventSourceResponse:
     return EventSourceResponse(
         stream_with_custom_separator(),
         sep="\n",  # Use LF instead of CRLF
-        ping=5
+        ping=5,
     )
 
 
@@ -180,10 +170,10 @@ async def proxy_friendly_endpoint() -> EventSourceResponse:
         stream_with_custom_ping(),
         headers={
             "Cache-Control": "public, max-age=29",  # Allow proxy caching
-            "X-Custom-Header": "proxy-optimized"
+            "X-Custom-Header": "proxy-optimized",
         },
         background=BackgroundTask(background_cleanup_task),
-        ping=5
+        ping=5,
     )
 
 
@@ -197,8 +187,8 @@ async def health_check() -> dict:
             "custom_ping",
             "error_handling",
             "custom_separators",
-            "proxy_friendly"
-        ]
+            "proxy_friendly",
+        ],
     }
 
 

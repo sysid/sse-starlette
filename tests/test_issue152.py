@@ -23,7 +23,7 @@ WATCHER_DETECT_TIMEOUT = WATCHER_POLL_INTERVAL + 0.2  # 0.7s
 
 
 class TestIssue152WatcherLeak:
-    """Regression tests for Issue #152: only one watcher per thread. """
+    """Regression tests for Issue #152: only one watcher per thread."""
 
     @pytest.mark.asyncio
     async def test_single_watcher_per_thread(self):
@@ -124,9 +124,9 @@ class TestIssue152WatcherLeak:
 
             await asyncio.sleep(0.1)
 
-            assert len(watcher_starts) == 1, (
-                f"Rapid calls spawned {len(watcher_starts)} watchers, expected 1"
-            )
+            assert (
+                len(watcher_starts) == 1
+            ), f"Rapid calls spawned {len(watcher_starts)} watchers, expected 1"
         finally:
             sse_module._shutdown_watcher = original_watcher
 

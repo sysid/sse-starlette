@@ -41,7 +41,7 @@ async def data_producer(send_channel: anyio.abc.ObjectSendStream, producer_id: s
                 event_data = {
                     "data": f"Data from producer {producer_id}, item {i}",
                     "id": f"{producer_id}-{i}",
-                    "event": "production_data"
+                    "event": "production_data",
                 }
 
                 # Send through channel (non-blocking)
@@ -49,18 +49,17 @@ async def data_producer(send_channel: anyio.abc.ObjectSendStream, producer_id: s
                 print(f"📤 Producer {producer_id} sent item {i}")
 
             # Send completion signal
-            await send_channel.send({
-                "data": f"Producer {producer_id} completed",
-                "event": "producer_complete"
-            })
+            await send_channel.send(
+                {
+                    "data": f"Producer {producer_id} completed",
+                    "event": "producer_complete",
+                }
+            )
 
         except Exception as e:
             print(f"💥 Producer {producer_id} error: {e}")
             # Send error through channel
-            await send_channel.send({
-                "data": f"Producer error: {e}",
-                "event": "error"
-            })
+            await send_channel.send({"data": f"Producer error: {e}", "event": "error"})
 
         finally:
             print(f"🧹 Producer {producer_id} cleanup completed")
@@ -82,7 +81,7 @@ async def memory_channel_endpoint(request: Request):
     return EventSourceResponse(
         receive_channel,  # Consumer side of the channel
         data_sender_callable=partial(data_producer, send_channel, producer_id),
-        ping=5
+        ping=5,
     )
 
 
@@ -92,7 +91,9 @@ async def multi_producer_endpoint(request: Request):
     Demonstrates how memory channels enable complex data flows.
     """
     # Create channel for combined output
-    combined_send, combined_receive = anyio.create_memory_object_stream(max_buffer_size=20)
+    combined_send, combined_receive = anyio.create_memory_object_stream(
+        max_buffer_size=20
+    )
 
     async def multi_producer_coordinator(combined_channel):
         """
@@ -103,7 +104,9 @@ async def multi_producer_endpoint(request: Request):
                 # Create multiple producer channels
                 producer_channels = []
                 for i in range(3):  # 3 producers
-                    send_ch, recv_ch = anyio.create_memory_object_stream(max_buffer_size=5)
+                    send_ch, recv_ch = anyio.create_memory_object_stream(
+                        max_buffer_size=5
+                    )
                     producer_channels.append((send_ch, recv_ch, f"multi-{i}"))
 
                 async with anyio.create_task_group() as tg:
@@ -114,25 +117,28 @@ async def multi_producer_endpoint(request: Request):
                     # Merge all producer outputs
                     async def merge_outputs():
                         # Collect all receive channels
-                        receive_channels = [recv_ch for _, recv_ch, _ in producer_channels]
+                        receive_channels = [
+                            recv_ch for _, recv_ch, _ in producer_channels
+                        ]
 
                         # Use anyio to multiplex channels
                         async with anyio.create_task_group() as merge_tg:
                             for recv_ch in receive_channels:
-                                merge_tg.start_soon(forward_channel_data, recv_ch, combined_channel)
+                                merge_tg.start_soon(
+                                    forward_channel_data, recv_ch, combined_channel
+                                )
 
                     tg.start_soon(merge_outputs)
 
             except Exception as e:
-                await combined_channel.send({
-                    "data": f"Multi-producer error: {e}",
-                    "event": "error"
-                })
+                await combined_channel.send(
+                    {"data": f"Multi-producer error: {e}", "event": "error"}
+                )
 
     return EventSourceResponse(
         combined_receive,
         data_sender_callable=partial(multi_producer_coordinator, combined_send),
-        ping=3
+        ping=3,
     )
 
 
@@ -165,7 +171,7 @@ async def backpressure_demo_endpoint(request: Request):
                     event_data = {
                         "data": f"Fast data {i} - buffer may be full!",
                         "id": str(i),
-                        "event": "fast_data"
+                        "event": "fast_data",
                     }
 
                     print(f"🚀 Trying to send item {i}")
@@ -179,24 +185,23 @@ async def backpressure_demo_endpoint(request: Request):
 
             except Exception as e:
                 print(f"💥 Fast producer error: {e}")
-                await channel.send({
-                    "data": f"Producer error: {e}",
-                    "event": "error"
-                })
+                await channel.send({"data": f"Producer error: {e}", "event": "error"})
 
     return EventSourceResponse(
         receive_channel,
         data_sender_callable=partial(fast_producer, send_channel),
-        ping=2
+        ping=2,
     )
 
 
 # Test application
-app = Starlette(routes=[
-    Route("/memory-channel", memory_channel_endpoint),
-    Route("/multi-producer", multi_producer_endpoint),
-    Route("/backpressure", backpressure_demo_endpoint)
-])
+app = Starlette(
+    routes=[
+        Route("/memory-channel", memory_channel_endpoint),
+        Route("/multi-producer", multi_producer_endpoint),
+        Route("/backpressure", backpressure_demo_endpoint),
+    ]
+)
 
 if __name__ == "__main__":
     """

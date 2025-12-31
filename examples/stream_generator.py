@@ -34,6 +34,7 @@ for i in {1..5}; do
 done
 """
 
+
 class Stream:
     def __init__(self) -> None:
         self._queue: Optional[asyncio.Queue[ServerSentEvent]] = None
@@ -65,9 +66,7 @@ async def sse(stream: Stream = Depends(lambda: _stream)) -> EventSourceResponse:
 
 @app.post("/message", status_code=status.HTTP_201_CREATED)
 async def send_message(message: str, stream: Stream = Depends(lambda: _stream)) -> None:
-    await stream.asend(
-        ServerSentEvent(data=message)
-    )
+    await stream.asend(ServerSentEvent(data=message))
 
 
 if __name__ == "__main__":

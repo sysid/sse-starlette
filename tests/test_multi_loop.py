@@ -84,7 +84,10 @@ class TestMultiLoopSafety:
 
         assert not errors, f"Errors occurred: {errors}"
         assert len(states) == 3
-        assert len(set(id(s) for s in states)) == 3, "States should be unique per thread"
+        assert (
+            len(set(id(s) for s in states)) == 3
+        ), "States should be unique per thread"
+
 
 class TestIssue149HandleExitSignaling:
     """
@@ -159,7 +162,9 @@ class TestIssue149HandleExitSignaling:
             except asyncio.CancelledError:
                 pass
 
-        assert len(exited) == num_tasks, f"Only {len(exited)}/{num_tasks} tasks woke up."
+        assert (
+            len(exited) == num_tasks
+        ), f"Only {len(exited)}/{num_tasks} tasks woke up."
 
     @pytest.mark.asyncio
     async def test_all_tasks_share_same_shutdown_state(self):
@@ -183,4 +188,3 @@ class TestIssue149HandleExitSignaling:
             f"Expected all tasks to share one state, but found {len(unique_ids)} unique states. "
             f"This indicates threading.local is not working as expected."
         )
-

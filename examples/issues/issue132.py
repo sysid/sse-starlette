@@ -45,7 +45,6 @@ async def index() -> HTMLResponse:
 
 @app.get("/events")
 async def event_source() -> EventSourceResponse:
-
     async def event_generator():
         for x in itertools.count():
             yield x
@@ -56,5 +55,6 @@ async def event_source() -> EventSourceResponse:
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.main()
     # uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

@@ -37,7 +37,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def generate_numbers(start: int, end: int, delay: float = 1.0) -> AsyncGenerator[dict, None]:
+async def generate_numbers(
+    start: int, end: int, delay: float = 1.0
+) -> AsyncGenerator[dict, None]:
     """Generate numbered events with configurable range and delay."""
     for number in range(start, end + 1):
         await asyncio.sleep(delay)

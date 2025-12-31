@@ -26,9 +26,10 @@ async def endless(req: Request):
     to enable proper server shutdown. Otherwise, there will be dangling tasks preventing proper shutdown.
     """
     send_chan, recv_chan = anyio.create_memory_object_stream(10)
+
     async def event_publisher(inner_send_chan: MemoryObjectSendStream):
         async with inner_send_chan:
-            try: 
+            try:
                 i = 0
                 while True:
                     i += 1
@@ -40,8 +41,9 @@ async def endless(req: Request):
                     await inner_send_chan.send(dict(closing=True))
                     raise e
 
-    return EventSourceResponse(recv_chan, data_sender_callable=partial(event_publisher, send_chan))
-
+    return EventSourceResponse(
+        recv_chan, data_sender_callable=partial(event_publisher, send_chan)
+    )
 
 
 @app.get("/endless-trio")
@@ -51,12 +53,15 @@ async def endless_trio(req: Request):
     In case of server shutdown the running task has to be stopped via signal handler in order
     to enable proper server shutdown. Otherwise, there will be dangling tasks preventing proper shutdown.
     """
-    raise Exception("Trio is not compatible with uvicorn, this code is for example purposes")
+    raise Exception(
+        "Trio is not compatible with uvicorn, this code is for example purposes"
+    )
 
     send_chan, recv_chan = trio.open_memory_channel(10)
+
     async def event_publisher(inner_send_chan: trio.MemorySendChannel):
         async with inner_send_chan:
-            try: 
+            try:
                 i = 0
                 while True:
                     i += 1
@@ -65,12 +70,13 @@ async def endless_trio(req: Request):
             except trio.Cancelled as e:
                 _log.info(f"Disconnected from client (via refresh/close) {req.client}")
                 with anyio.move_on_after(1, shield=True):
-                    # This may not make it 
+                    # This may not make it
                     await inner_send_chan.send(dict(closing=True))
                     raise e
 
-    return EventSourceResponse(recv_chan, data_sender_callable=partial(event_publisher, send_chan))
-
+    return EventSourceResponse(
+        recv_chan, data_sender_callable=partial(event_publisher, send_chan)
+    )
 
 
 if __name__ == "__main__":

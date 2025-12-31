@@ -55,7 +55,7 @@ class LoadTestServer:
             "total_connections": self.total_connections,
             "events_sent": self.events_sent,
             "uptime_seconds": uptime,
-            "events_per_second": self.events_sent / uptime if uptime > 0 else 0
+            "events_per_second": self.events_sent / uptime if uptime > 0 else 0,
         }
 
 
@@ -91,14 +91,14 @@ async def sse_endpoint(request: Request):
 
 async def stats_endpoint(request: Request):
     from starlette.responses import JSONResponse
+
     return JSONResponse(server.stats)
 
 
 # Test application
-app = Starlette(routes=[
-    Route("/events", sse_endpoint),
-    Route("/stats", stats_endpoint)
-])
+app = Starlette(
+    routes=[Route("/events", sse_endpoint), Route("/stats", stats_endpoint)]
+)
 
 
 class LoadTestClient:
@@ -160,29 +160,29 @@ async def run_load_test(num_clients=10, base_url="http://localhost:8000"):
                 try:
                     response = await http_client.get(f"{base_url}/stats")
                     stats = response.json()
-                    print(f"📊 Active: {stats['active_connections']}, "
-                          f"Events/sec: {stats['events_per_second']:.1f}")
+                    print(
+                        f"📊 Active: {stats['active_connections']}, "
+                        f"Events/sec: {stats['events_per_second']:.1f}"
+                    )
                 except:
                     pass
 
     # Run load test
     start_time = time.time()
-    await asyncio.gather(
-        *client_tasks,
-        progress_monitor(),
-        return_exceptions=True
-    )
+    await asyncio.gather(*client_tasks, progress_monitor(), return_exceptions=True)
 
     # Analyze results
     total_duration = time.time() - start_time
     successful_clients = [c for c in clients if c.events_received > 0]
 
-    print(f"\n📈 Load Test Results:")
+    print("\n📈 Load Test Results:")
     print(f"   Clients: {num_clients}")
     print(f"   Successful: {len(successful_clients)}")
     print(f"   Duration: {total_duration:.1f}s")
     print(f"   Total events: {sum(c.events_received for c in clients)}")
-    print(f"   Avg events per client: {sum(c.events_received for c in clients) / len(clients):.1f}")
+    print(
+        f"   Avg events per client: {sum(c.events_received for c in clients) / len(clients):.1f}"
+    )
 
 
 if __name__ == "__main__":
@@ -211,4 +211,3 @@ if __name__ == "__main__":
         print("🚀 Starting SSE load test server...")
         print("📋 Run load test with: python load_simulation.py test 20")
         uvicorn.run(app, host="localhost", port=8000, log_level="error")
-

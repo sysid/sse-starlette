@@ -29,6 +29,7 @@ from sse_starlette.event import ServerSentEvent, ensure_bytes
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class _ShutdownState:
     """Per-thread state for shutdown coordination.
@@ -47,7 +48,7 @@ _thread_state = threading.local()
 
 def _get_shutdown_state() -> _ShutdownState:
     """Get or create shutdown state for the current thread."""
-    state = getattr(_thread_state, 'shutdown_state', None)
+    state = getattr(_thread_state, "shutdown_state", None)
     if state is None:
         state = _ShutdownState()
         _thread_state.shutdown_state = state

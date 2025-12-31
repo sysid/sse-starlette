@@ -88,7 +88,12 @@ class TaskDatabaseStream:
     4. Handle client disconnection gracefully
     """
 
-    def __init__(self, request: Request, completed_filter: Optional[bool] = None, limit: Optional[int] = None):
+    def __init__(
+        self,
+        request: Request,
+        completed_filter: Optional[bool] = None,
+        limit: Optional[int] = None,
+    ):
         self.request = request
         self.completed_filter = completed_filter
         self.limit = limit
@@ -103,7 +108,7 @@ class TaskDatabaseStream:
         This ensures the query runs within the correct async context
         and uses a fresh session created specifically for this stream.
         """
-        if not hasattr(self, '_results'):
+        if not hasattr(self, "_results"):
             await self._execute_query()
             self._index = 0
 
@@ -124,10 +129,10 @@ class TaskDatabaseStream:
                 "id": result.id,
                 "title": result.title,
                 "description": result.description,
-                "completed": bool(result.completed)
+                "completed": bool(result.completed),
             },
             "event": "task",
-            "id": str(result.id)
+            "id": str(result.id),
         }
 
     async def _execute_query(self):
@@ -155,16 +160,18 @@ class TaskDatabaseStream:
             # Prepare parameters for SQLAlchemy
             params = {}
             if self.completed_filter is not None:
-                params['completed'] = int(self.completed_filter)
+                params["completed"] = int(self.completed_filter)
             if self.limit:
-                params['limit'] = self.limit
+                params["limit"] = self.limit
 
             # Execute query using async iteration pattern from example
             result = await session.execute(sa.text(query), params)
             self._results = result.fetchall()
 
 
-async def correct_task_stream(request: Request, completed: Optional[bool] = None, limit: Optional[int] = None) -> AsyncGenerator[dict, None]:
+async def correct_task_stream(
+    request: Request, completed: Optional[bool] = None, limit: Optional[int] = None
+) -> AsyncGenerator[dict, None]:
     """
     CORRECT: Alternative implementation using async generator function.
 
@@ -181,13 +188,13 @@ async def correct_task_stream(request: Request, completed: Optional[bool] = None
 
         if completed is not None:
             query += " WHERE completed = :completed"
-            params['completed'] = int(completed)
+            params["completed"] = int(completed)
 
         query += " ORDER BY id"
 
         if limit:
             query += " LIMIT :limit"
-            params['limit'] = limit
+            params["limit"] = limit
 
         # Execute query and iterate over results
         result = await session.execute(sa.text(query), params)
@@ -202,16 +209,18 @@ async def correct_task_stream(request: Request, completed: Optional[bool] = None
                     "id": row.id,
                     "title": row.title,
                     "description": row.description,
-                    "completed": bool(row.completed)
+                    "completed": bool(row.completed),
                 },
                 "event": "task",
-                "id": str(row.id)
+                "id": str(row.id),
             }
 
             await asyncio.sleep(0.3)
 
 
-async def incorrect_task_stream_example(session: AsyncSession, request: Request) -> AsyncGenerator[dict, None]:
+async def incorrect_task_stream_example(
+    session: AsyncSession, request: Request
+) -> AsyncGenerator[dict, None]:
     """
     INCORRECT: This pattern will cause issues with anyio task groups.
 
@@ -234,7 +243,7 @@ async def incorrect_task_stream_example(session: AsyncSession, request: Request)
 async def stream_tasks_endpoint(
     request: Request,
     completed: Optional[bool] = Query(None, description="Filter by completion status"),
-    limit: Optional[int] = Query(None, description="Limit number of results")
+    limit: Optional[int] = Query(None, description="Limit number of results"),
 ) -> EventSourceResponse:
     """
     SSE endpoint that streams database query results.
@@ -250,7 +259,7 @@ async def stream_tasks_endpoint(
 async def stream_tasks_function_endpoint(
     request: Request,
     completed: Optional[bool] = Query(None, description="Filter by completion status"),
-    limit: Optional[int] = Query(None, description="Limit number of results")
+    limit: Optional[int] = Query(None, description="Limit number of results"),
 ) -> EventSourceResponse:
     """
     Alternative SSE endpoint using generator function instead of class.
@@ -265,7 +274,7 @@ async def stream_tasks_function_endpoint(
 async def list_tasks_endpoint(
     session: AsyncDbSessionDependency,
     completed: Optional[bool] = Query(None, description="Filter by completion status"),
-    limit: Optional[int] = Query(None, description="Limit number of results")
+    limit: Optional[int] = Query(None, description="Limit number of results"),
 ) -> dict:
     """
     Regular JSON endpoint - safe to use dependency injection.
@@ -278,13 +287,13 @@ async def list_tasks_endpoint(
 
     if completed is not None:
         query += " WHERE completed = :completed"
-        params['completed'] = int(completed)
+        params["completed"] = int(completed)
 
     query += " ORDER BY id"
 
     if limit:
         query += " LIMIT :limit"
-        params['limit'] = limit
+        params["limit"] = limit
 
     result = await session.execute(sa.text(query), params)
     rows = result.fetchall()
@@ -292,7 +301,7 @@ async def list_tasks_endpoint(
     return {
         "tasks": [dict(row._mapping) for row in rows],
         "total": len(rows),
-        "streaming_available": True
+        "streaming_available": True,
     }
 
 

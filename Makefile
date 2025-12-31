@@ -114,7 +114,7 @@ format-check:  ## perform black formatting
 	@ruff format --check $(pkg_src) $(tests_src)
 
 .PHONY: style
-style: sort-imports format  ## perform code style format
+style: format  ## perform code style format
 
 .PHONY: lint
 lint:  ## check style with ruff
@@ -123,6 +123,10 @@ lint:  ## check style with ruff
 .PHONY: mypy
 mypy:  ## check type hint annotations
 	@mypy --config-file pyproject.toml --install-types --non-interactive $(pkg_src)
+
+.PHONY: pre-commit-install
+pre-commit-install:  ## install pre-commit hooks
+	pre-commit install
 
 ################################################################################
 # Clean \

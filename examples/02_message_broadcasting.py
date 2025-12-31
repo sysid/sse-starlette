@@ -44,7 +44,7 @@ class BroadcastStream:
     which allows EventSourceResponse to consume it directly.
     """
 
-    def __init__(self, request: Request, broadcaster: 'MessageBroadcaster'):
+    def __init__(self, request: Request, broadcaster: "MessageBroadcaster"):
         self.request = request
         self.broadcaster = broadcaster
         self.queue: Optional[asyncio.Queue] = None
@@ -170,6 +170,7 @@ class MessageBroadcaster:
 
 class MessageRequest(BaseModel):
     """Request body for the broadcast endpoint."""
+
     message: str
     event: Optional[str] = None
 
@@ -200,14 +201,13 @@ async def send_message(message_request: MessageRequest):
     REST endpoint to broadcast a message to all connected SSE clients.
     """
     await broadcaster.broadcast(
-        message=message_request.message,
-        event=message_request.event
+        message=message_request.message, event=message_request.event
     )
 
     return {
         "status": "sent",
         "clients": broadcaster.client_count,
-        "message": message_request.message
+        "message": message_request.message,
     }
 
 
@@ -223,7 +223,8 @@ if __name__ == "__main__":
     print("SSE Broadcasting Server")
     print("Connect:    curl -N http://localhost:8000/events")
     print(
-        "Send msg:   curl -X POST http://localhost:8000/send -H 'Content-Type: application/json' -d '{\"message\": \"Hello\"}'")
+        "Send msg:   curl -X POST http://localhost:8000/send -H 'Content-Type: application/json' -d '{\"message\": \"Hello\"}'"
+    )
     print("Status:     curl http://localhost:8000/status")
 
     uvicorn.run(app, host="127.0.0.1", port=8000)

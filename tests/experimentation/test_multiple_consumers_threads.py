@@ -115,7 +115,9 @@ async def make_arequest(url, expected_lines=2):
         except httpcore.RemoteProtocolError as e:
             _log.error(e)
         finally:
-            assert i == expected_lines, (
+            assert (
+                i == expected_lines
+            ), (
                 f"Expected {expected_lines} lines"
             )  # not part of test runner, failure is not reported
 
@@ -126,7 +128,9 @@ async def make_arequest(url, expected_lines=2):
         # i=0, line='data: 1'
         # i=1, line=''
         # ...
-        assert i == expected_lines, (
+        assert (
+            i == expected_lines
+        ), (
             f"Expected {expected_lines} lines"
         )  # not part of test runner, failure is not reported
 

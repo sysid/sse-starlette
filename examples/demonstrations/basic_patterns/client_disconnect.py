@@ -32,20 +32,20 @@ class ConnectionTracker:
 
     def add_connection(self, connection_id, info):
         self.connections[connection_id] = {
-            'start_time': asyncio.get_event_loop().time(),
-            'info': info,
-            'events_sent': 0
+            "start_time": asyncio.get_event_loop().time(),
+            "info": info,
+            "events_sent": 0,
         }
         print(f"➕ Connection {connection_id} added. Total: {len(self.connections)}")
 
     def update_connection(self, connection_id, events_sent):
         if connection_id in self.connections:
-            self.connections[connection_id]['events_sent'] = events_sent
+            self.connections[connection_id]["events_sent"] = events_sent
 
     def remove_connection(self, connection_id, reason="unknown"):
         if connection_id in self.connections:
             conn = self.connections.pop(connection_id)
-            duration = asyncio.get_event_loop().time() - conn['start_time']
+            duration = asyncio.get_event_loop().time() - conn["start_time"]
             print(f"➖ Connection {connection_id} removed ({reason})")
             print(f"   Duration: {duration:.1f}s, Events sent: {conn['events_sent']}")
             print(f"   Active connections: {len(self.connections)}")
@@ -60,7 +60,9 @@ async def monitored_stream(request: Request):
     Stream that actively monitors for client disconnection.
     """
     connection_id = id(request)
-    client_info = f"Client from {request.client}" if request.client else "Unknown client"
+    client_info = (
+        f"Client from {request.client}" if request.client else "Unknown client"
+    )
 
     # Register this connection
     tracker.add_connection(connection_id, client_info)
@@ -72,7 +74,9 @@ async def monitored_stream(request: Request):
             # CRITICAL: Check for disconnection before sending each event
             if await request.is_disconnected():
                 tracker.remove_connection(connection_id, "client_disconnected")
-                print(f"🔌 Client {connection_id} disconnected after {events_sent} events")
+                print(
+                    f"🔌 Client {connection_id} disconnected after {events_sent} events"
+                )
                 break
 
             # Send event
@@ -108,24 +112,26 @@ async def sse_endpoint(request: Request):
 async def status_endpoint(request: Request):
     """Show current connection status."""
     from starlette.responses import JSONResponse
-    return JSONResponse({
-        "active_connections": len(tracker.connections),
-        "connections": {
-            str(conn_id): {
-                "duration": asyncio.get_event_loop().time() - conn["start_time"],
-                "events_sent": conn["events_sent"],
-                "info": conn["info"]
-            }
-            for conn_id, conn in tracker.connections.items()
+
+    return JSONResponse(
+        {
+            "active_connections": len(tracker.connections),
+            "connections": {
+                str(conn_id): {
+                    "duration": asyncio.get_event_loop().time() - conn["start_time"],
+                    "events_sent": conn["events_sent"],
+                    "info": conn["info"],
+                }
+                for conn_id, conn in tracker.connections.items()
+            },
         }
-    })
+    )
 
 
 # Test application
-app = Starlette(routes=[
-    Route("/events", sse_endpoint),
-    Route("/status", status_endpoint)
-])
+app = Starlette(
+    routes=[Route("/events", sse_endpoint), Route("/status", status_endpoint)]
+)
 
 if __name__ == "__main__":
     """

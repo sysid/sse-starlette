@@ -18,7 +18,7 @@ import asyncio
 import json
 from dataclasses import dataclass, asdict
 from enum import Enum
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Route
@@ -27,6 +27,7 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 
 class TaskStatus(Enum):
     """Task execution states in our custom protocol."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -39,6 +40,7 @@ class TaskProgressEvent:
     Custom protocol message for task progress updates.
     This demonstrates structured data over SSE.
     """
+
     task_id: str
     status: TaskStatus
     progress_percent: int
@@ -51,13 +53,14 @@ class TaskProgressEvent:
         return ServerSentEvent(
             data=json.dumps(asdict(self)),
             event="task_progress",
-            id=f"{self.task_id}-{int(self.timestamp)}"
+            id=f"{self.task_id}-{int(self.timestamp)}",
         )
 
 
 @dataclass
 class SystemHealthEvent:
     """Protocol message for system health monitoring."""
+
     component: str
     status: str
     metrics: Dict[str, float]
@@ -68,7 +71,7 @@ class SystemHealthEvent:
         return ServerSentEvent(
             data=json.dumps(asdict(self)),
             event="health_update",
-            id=f"health-{int(self.timestamp)}"
+            id=f"health-{int(self.timestamp)}",
         )
 
 
@@ -93,7 +96,9 @@ class CustomProtocolHandler:
 
         # Store client capabilities
         client_id = str(id(request))
-        self.client_capabilities[client_id] = set(f.strip() for f in client_features if f.strip())
+        self.client_capabilities[client_id] = set(
+            f.strip() for f in client_features if f.strip()
+        )
 
         return {
             "server_version": self.protocol_version,
@@ -102,16 +107,18 @@ class CustomProtocolHandler:
                 "task_progress",
                 "health_update",
                 "system_alert",
-                "protocol_info"
+                "protocol_info",
             ],
-            "features": ["compression", "batching", "filtering"]
+            "features": ["compression", "batching", "filtering"],
         }
 
     def supports_feature(self, client_id: str, feature: str) -> bool:
         """Check if client supports a specific feature."""
         return feature in self.client_capabilities.get(client_id, set())
 
-    async def create_protocol_handshake_event(self, request: Request) -> ServerSentEvent:
+    async def create_protocol_handshake_event(
+        self, request: Request
+    ) -> ServerSentEvent:
         """
         Create initial handshake event with protocol information.
         This establishes the custom protocol session.
@@ -119,9 +126,7 @@ class CustomProtocolHandler:
         protocol_info = self.negotiate_protocol(request)
 
         return ServerSentEvent(
-            data=json.dumps(protocol_info),
-            event="protocol_handshake",
-            id="handshake-0"
+            data=json.dumps(protocol_info), event="protocol_handshake", id="handshake-0"
         )
 
 
@@ -143,7 +148,7 @@ async def task_monitoring_protocol(request: Request):
     tasks = [
         {"id": "build-001", "name": "Build Application", "duration": 8},
         {"id": "test-001", "name": "Run Tests", "duration": 5},
-        {"id": "deploy-001", "name": "Deploy to Production", "duration": 3}
+        {"id": "deploy-001", "name": "Deploy to Production", "duration": 3},
     ]
 
     import time
@@ -159,7 +164,7 @@ async def task_monitoring_protocol(request: Request):
                 status=TaskStatus.PENDING,
                 progress_percent=0,
                 message=f"Starting {task['name']}",
-                timestamp=time.time()
+                timestamp=time.time(),
             )
             yield start_event.to_sse_event()
 
@@ -177,7 +182,7 @@ async def task_monitoring_protocol(request: Request):
                     progress_percent=progress,
                     message=message,
                     timestamp=time.time(),
-                    metadata={"phase": "execution", "worker": f"worker-{task_id[-1]}"}
+                    metadata={"phase": "execution", "worker": f"worker-{task_id[-1]}"},
                 )
 
                 yield progress_event.to_sse_event()
@@ -193,7 +198,7 @@ async def task_monitoring_protocol(request: Request):
             status=TaskStatus.FAILED,
             progress_percent=0,
             message=f"Protocol error: {e}",
-            timestamp=time.time()
+            timestamp=time.time(),
         )
         yield error_event.to_sse_event()
 
@@ -232,7 +237,13 @@ async def system_monitoring_protocol(request: Request):
                 if response_time > 300:
                     alerts.append(f"Slow response time: {response_time:.0f}ms")
 
-                status = "healthy" if not alerts else "warning" if len(alerts) < 2 else "critical"
+                status = (
+                    "healthy"
+                    if not alerts
+                    else "warning"
+                    if len(alerts) < 2
+                    else "critical"
+                )
 
                 health_event = SystemHealthEvent(
                     component=component,
@@ -241,10 +252,10 @@ async def system_monitoring_protocol(request: Request):
                         "cpu_usage_percent": cpu_usage,
                         "memory_usage_percent": memory_usage,
                         "response_time_ms": response_time,
-                        "uptime_hours": cycle * 0.1
+                        "uptime_hours": cycle * 0.1,
                     },
                     alerts=alerts,
-                    timestamp=time.time()
+                    timestamp=time.time(),
                 )
 
                 yield health_event.to_sse_event()
@@ -258,7 +269,7 @@ async def system_monitoring_protocol(request: Request):
             status="failed",
             metrics={},
             alerts=[f"Monitoring system error: {e}"],
-            timestamp=time.time()
+            timestamp=time.time(),
         )
         yield error_event.to_sse_event()
 
@@ -273,23 +284,25 @@ async def multi_protocol_endpoint(request: Request):
     if protocol_type == "task":
         return EventSourceResponse(
             task_monitoring_protocol(request),
-            headers={"X-Protocol-Type": "task-monitoring-v1"}
+            headers={"X-Protocol-Type": "task-monitoring-v1"},
         )
     elif protocol_type == "health":
         return EventSourceResponse(
             system_monitoring_protocol(request),
-            headers={"X-Protocol-Type": "health-monitoring-v1"}
+            headers={"X-Protocol-Type": "health-monitoring-v1"},
         )
     else:
         # Default: Send protocol information
         async def protocol_info():
             yield ServerSentEvent(
-                data=json.dumps({
-                    "error": f"Unknown protocol: {protocol_type}",
-                    "available_protocols": ["task", "health"],
-                    "usage": "Add ?protocol=<type> to URL"
-                }),
-                event="protocol_error"
+                data=json.dumps(
+                    {
+                        "error": f"Unknown protocol: {protocol_type}",
+                        "available_protocols": ["task", "health"],
+                        "usage": "Add ?protocol=<type> to URL",
+                    }
+                ),
+                event="protocol_error",
             )
 
         return EventSourceResponse(protocol_info())
@@ -308,6 +321,7 @@ async def compressed_protocol_endpoint(request: Request):
         yield protocol_handler.create_protocol_handshake_event(request)
 
         import time
+
         batch_buffer = []
 
         # Generate high-frequency data
@@ -319,10 +333,7 @@ async def compressed_protocol_endpoint(request: Request):
                 "sequence": i,
                 "timestamp": time.time(),
                 "data": f"High frequency data point {i}",
-                "metrics": {
-                    "value": i * 1.5,
-                    "rate": i / 10.0
-                }
+                "metrics": {"value": i * 1.5, "rate": i / 10.0},
             }
 
             if supports_batching:
@@ -333,15 +344,13 @@ async def compressed_protocol_endpoint(request: Request):
                     yield ServerSentEvent(
                         data=json.dumps({"batch": batch_buffer}),
                         event="data_batch",
-                        id=f"batch-{i // 5}"
+                        id=f"batch-{i // 5}",
                     )
                     batch_buffer = []
             else:
                 # Send individual events
                 yield ServerSentEvent(
-                    data=json.dumps(event_data),
-                    event="data_point",
-                    id=str(i)
+                    data=json.dumps(event_data), event="data_point", id=str(i)
                 )
 
             await asyncio.sleep(0.1)
@@ -351,17 +360,19 @@ async def compressed_protocol_endpoint(request: Request):
             yield ServerSentEvent(
                 data=json.dumps({"batch": batch_buffer}),
                 event="data_batch",
-                id="final-batch"
+                id="final-batch",
             )
 
     return EventSourceResponse(compressed_stream())
 
 
 # Test application
-app = Starlette(routes=[
-    Route("/protocols", multi_protocol_endpoint),
-    Route("/compressed", compressed_protocol_endpoint)
-])
+app = Starlette(
+    routes=[
+        Route("/protocols", multi_protocol_endpoint),
+        Route("/compressed", compressed_protocol_endpoint),
+    ]
+)
 
 if __name__ == "__main__":
     """

@@ -35,14 +35,14 @@ def reset_shutdown_state():
 
     # Setup: clean state
     AppStatus.should_exit = False
-    if hasattr(_thread_state, 'shutdown_state'):
+    if hasattr(_thread_state, "shutdown_state"):
         del _thread_state.shutdown_state
 
     yield
 
     # Teardown: signal shutdown to kill any running watchers, then clean up
     AppStatus.should_exit = True
-    if hasattr(_thread_state, 'shutdown_state'):
+    if hasattr(_thread_state, "shutdown_state"):
         del _thread_state.shutdown_state
 
 

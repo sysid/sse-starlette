@@ -18,7 +18,6 @@ import asyncio
 import random
 from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Route
@@ -27,6 +26,7 @@ from sse_starlette import EventSourceResponse
 
 class ErrorType(Enum):
     """Different types of errors that can occur in SSE streams."""
+
     TRANSIENT = "transient"  # Temporary issues, can retry
     RECOVERABLE = "recoverable"  # Errors we can work around
     FATAL = "fatal"  # Unrecoverable errors
@@ -35,6 +35,7 @@ class ErrorType(Enum):
 @dataclass
 class StreamState:
     """Maintains state across error recovery attempts."""
+
     last_successful_event: int = 0
     error_count: int = 0
     recovery_attempts: int = 0
@@ -94,7 +95,7 @@ async def resilient_stream_with_recovery(request: Request, stream_state: StreamS
                 event_data = {
                     "data": f"Event {i} - State: errors={stream_state.error_count}, recoveries={stream_state.recovery_attempts}",
                     "id": str(i),
-                    "event": "data"
+                    "event": "data",
                 }
 
                 yield event_data
@@ -109,7 +110,7 @@ async def resilient_stream_with_recovery(request: Request, stream_state: StreamS
 
                 yield {
                     "data": f"Temporary connection issue, retrying... (attempt {stream_state.recovery_attempts + 1})",
-                    "event": "recovery"
+                    "event": "recovery",
                 }
 
                 # Wait and retry
@@ -126,7 +127,7 @@ async def resilient_stream_with_recovery(request: Request, stream_state: StreamS
                 fallback_data = {
                     "data": f"Fallback data for event {i} (original data corrupted)",
                     "id": str(i),
-                    "event": "fallback"
+                    "event": "fallback",
                 }
 
                 yield fallback_data
@@ -137,10 +138,7 @@ async def resilient_stream_with_recovery(request: Request, stream_state: StreamS
                 # FATAL error - cannot recover
                 print(f"💀 Fatal error at event {i}: {e}")
 
-                yield {
-                    "data": f"Fatal error occurred: {e}",
-                    "event": "fatal_error"
-                }
+                yield {"data": f"Fatal error occurred: {e}", "event": "fatal_error"}
 
                 # Abort stream
                 return
@@ -148,16 +146,13 @@ async def resilient_stream_with_recovery(request: Request, stream_state: StreamS
     except Exception as e:
         # Unexpected error
         print(f"💥 Unexpected error in stream: {e}")
-        yield {
-            "data": f"Unexpected stream error: {e}",
-            "event": "stream_error"
-        }
+        yield {"data": f"Unexpected stream error: {e}", "event": "stream_error"}
 
     finally:
         # Always send completion info
         yield {
             "data": f"Stream completed - Events: {stream_state.last_successful_event}, Errors: {stream_state.error_count}",
-            "event": "completion"
+            "event": "completion",
         }
 
 
@@ -180,9 +175,7 @@ async def error_recovery_endpoint(request: Request):
             print(f"⚠️ Invalid Last-Event-ID: {last_event_id}")
 
     return EventSourceResponse(
-        resilient_stream_with_recovery(request, stream_state),
-        ping=3,
-        send_timeout=10.0
+        resilient_stream_with_recovery(request, stream_state), ping=3, send_timeout=10.0
     )
 
 
@@ -202,6 +195,7 @@ async def circuit_breaker_endpoint(request: Request):
         def is_available(self) -> bool:
             """Check if service is available according to circuit breaker."""
             import time
+
             current_time = time.time()
 
             if self.state == "OPEN":
@@ -220,6 +214,7 @@ async def circuit_breaker_endpoint(request: Request):
         def record_failure(self):
             """Record failed operation."""
             import time
+
             self.failure_count += 1
             self.last_failure_time = time.time()
 
@@ -235,7 +230,7 @@ async def circuit_breaker_endpoint(request: Request):
                 if not circuit_breaker.is_available():
                     yield {
                         "data": f"Service unavailable (circuit breaker OPEN) - event {i}",
-                        "event": "circuit_open"
+                        "event": "circuit_open",
                     }
                     await asyncio.sleep(1)
                     continue
@@ -250,13 +245,13 @@ async def circuit_breaker_endpoint(request: Request):
                 yield {
                     "data": f"Service call {i} successful (circuit breaker: {circuit_breaker.state})",
                     "id": str(i),
-                    "event": "success"
+                    "event": "success",
                 }
 
             except Exception as e:
                 yield {
                     "data": f"Service error: {e} (failures: {circuit_breaker.failure_count})",
-                    "event": "service_error"
+                    "event": "service_error",
                 }
 
             await asyncio.sleep(0.8)
@@ -265,10 +260,12 @@ async def circuit_breaker_endpoint(request: Request):
 
 
 # Test application
-app = Starlette(routes=[
-    Route("/error-recovery", error_recovery_endpoint),
-    Route("/circuit-breaker", circuit_breaker_endpoint)
-])
+app = Starlette(
+    routes=[
+        Route("/error-recovery", error_recovery_endpoint),
+        Route("/circuit-breaker", circuit_breaker_endpoint),
+    ]
+)
 
 if __name__ == "__main__":
     """

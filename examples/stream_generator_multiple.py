@@ -10,6 +10,7 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 This example shows how to use multiple streams.
 """
 
+
 class Stream:
     def __init__(self) -> None:
         self._queue = None
@@ -45,9 +46,7 @@ async def sse() -> EventSourceResponse:
 @app.post("/message", status_code=status.HTTP_201_CREATED)
 async def send_message(message: str, stream: Stream = Depends()) -> None:
     for stream in _streams:
-        await stream.asend(
-            ServerSentEvent(data=message)
-        )
+        await stream.asend(ServerSentEvent(data=message))
 
 
 if __name__ == "__main__":

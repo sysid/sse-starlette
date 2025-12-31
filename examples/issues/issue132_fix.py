@@ -9,16 +9,16 @@ approach with direct signal handler registration.
 Run with: python issue132_fix_demo.py
 Test with: Open http://localhost:8080 and press Ctrl+C to see graceful shutdown
 """
+
 import asyncio
 import logging
 import signal
-import threading
 import time
-from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, List, Any
+from datetime import datetime
+from typing import AsyncGenerator, Dict, Any
 
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
@@ -31,7 +31,7 @@ from sse_starlette.appstatus import AppStatus
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)8s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("issue132_demo")
 
@@ -39,6 +39,7 @@ logger = logging.getLogger("issue132_demo")
 # Global state for demonstration
 class DemoState:
     """Track demo state to show proper cleanup."""
+
     active_streams: int = 0
     total_events_sent: int = 0
     startup_time: float = time.time()
@@ -51,6 +52,7 @@ demo_state = DemoState()
 
 class StreamStats(BaseModel):
     """Response model for stream statistics."""
+
     active_streams: int
     total_events_sent: int
     uptime_seconds: float
@@ -72,8 +74,10 @@ def create_shutdown_callbacks() -> None:
 
     def final_shutdown_log():
         logger.info("✅ Shutdown callback #3: Final cleanup complete")
-        logger.info(f"📊 Final stats: {demo_state.active_streams} streams, "
-                    f"{demo_state.total_events_sent} events sent")
+        logger.info(
+            f"📊 Final stats: {demo_state.active_streams} streams, "
+            f"{demo_state.total_events_sent} events sent"
+        )
 
     # Register callbacks in order
     AppStatus.add_shutdown_callback(log_shutdown_initiation)
@@ -92,7 +96,9 @@ async def demonstrate_signal_handling() -> AsyncGenerator[Dict, None]:
     event_count = 0
 
     try:
-        logger.info(f"🚀 Starting demo stream (active streams: {demo_state.active_streams})")
+        logger.info(
+            f"🚀 Starting demo stream (active streams: {demo_state.active_streams})"
+        )
 
         while not AppStatus.should_exit:
             event_count += 1
@@ -107,7 +113,9 @@ async def demonstrate_signal_handling() -> AsyncGenerator[Dict, None]:
                 message = f"Status update: {demo_state.active_streams} active streams"
             else:
                 event_type = "data"
-                message = f"Event #{event_count} at {datetime.now().strftime('%H:%M:%S')}"
+                message = (
+                    f"Event #{event_count} at {datetime.now().strftime('%H:%M:%S')}"
+                )
 
             yield {
                 "event": event_type,
@@ -116,15 +124,17 @@ async def demonstrate_signal_handling() -> AsyncGenerator[Dict, None]:
                     "event_id": event_count,
                     "timestamp": time.time(),
                     "uptime": time.time() - demo_state.startup_time,
-                    "should_exit": AppStatus.should_exit
+                    "should_exit": AppStatus.should_exit,
                 },
-                "id": str(event_count)
+                "id": str(event_count),
             }
 
             # Check for shutdown more frequently than sleep interval
             for _ in range(10):  # Check 10 times per second
                 if AppStatus.should_exit:
-                    logger.info(f"🔄 Stream {id(asyncio.current_task())} received shutdown signal")
+                    logger.info(
+                        f"🔄 Stream {id(asyncio.current_task())} received shutdown signal"
+                    )
                     break
                 await asyncio.sleep(0.1)
 
@@ -136,8 +146,10 @@ async def demonstrate_signal_handling() -> AsyncGenerator[Dict, None]:
         raise
     finally:
         demo_state.active_streams -= 1
-        logger.info(f"🏁 Stream ended. Sent {event_count} events. "
-                    f"Active streams: {demo_state.active_streams}")
+        logger.info(
+            f"🏁 Stream ended. Sent {event_count} events. "
+            f"Active streams: {demo_state.active_streams}"
+        )
 
 
 async def health_monitoring_stream() -> AsyncGenerator[Dict, None]:
@@ -156,7 +168,9 @@ async def health_monitoring_stream() -> AsyncGenerator[Dict, None]:
             yield {
                 "event": "health_check",
                 "data": {
-                    "status": "healthy" if not AppStatus.should_exit else "shutting_down",
+                    "status": "healthy"
+                    if not AppStatus.should_exit
+                    else "shutting_down",
                     "check_number": check_count,
                     "active_streams": demo_state.active_streams,
                     "total_events": demo_state.total_events_sent,
@@ -165,10 +179,10 @@ async def health_monitoring_stream() -> AsyncGenerator[Dict, None]:
                     "app_status": {
                         "should_exit": AppStatus.should_exit,
                         "initialized": AppStatus._initialized,
-                        "callbacks_registered": len(AppStatus._shutdown_callbacks)
-                    }
+                        "callbacks_registered": len(AppStatus._shutdown_callbacks),
+                    },
                 },
-                "id": f"health_{check_count}"
+                "id": f"health_{check_count}",
             }
 
             # Health checks every 3 seconds, but check shutdown more frequently
@@ -189,7 +203,7 @@ async def health_monitoring_stream() -> AsyncGenerator[Dict, None]:
 app = FastAPI(
     title="Issue #132 Fix Demonstration",
     description="Demonstrates the enhanced AppStatus signal handling fix",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 app.add_middleware(
@@ -491,7 +505,7 @@ async def main_event_stream(request: Request) -> EventSourceResponse:
             "X-Demo-Purpose": "issue-132-fix",
             "X-Connection-ID": str(id(request)),
         },
-        ping=15  # Ping every 15 seconds
+        ping=15,  # Ping every 15 seconds
     )
 
 
@@ -506,7 +520,7 @@ async def health_stream(request: Request) -> EventSourceResponse:
             "X-Stream-Type": "health-monitoring",
             "X-Connection-ID": str(id(request)),
         },
-        ping=30  # Less frequent pings for health monitoring
+        ping=30,  # Less frequent pings for health monitoring
     )
 
 
@@ -517,7 +531,7 @@ async def get_statistics() -> StreamStats:
         active_streams=demo_state.active_streams,
         total_events_sent=demo_state.total_events_sent,
         uptime_seconds=time.time() - demo_state.startup_time,
-        shutdown_initiated=demo_state.shutdown_initiated
+        shutdown_initiated=demo_state.shutdown_initiated,
     )
 
 
@@ -536,7 +550,7 @@ async def test_signal_handling() -> Dict[str, Any]:
         "message": "Signal handling test triggered",
         "should_exit": AppStatus.should_exit,
         "shutdown_callbacks_count": len(AppStatus._shutdown_callbacks),
-        "app_status_initialized": AppStatus._initialized
+        "app_status_initialized": AppStatus._initialized,
     }
 
 

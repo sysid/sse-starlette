@@ -46,6 +46,7 @@ class NetworkSimulationMiddleware(BaseHTTPMiddleware):
         if self.simulate_failure and request.url.path == "/events":
             print("💥 Simulating network failure!")
             from starlette.responses import Response
+
             return Response("Network Error", status_code=503)
 
         return await call_next(request)
@@ -73,7 +74,7 @@ async def robust_stream(request: Request):
             yield {
                 "data": f"Event {i} - timestamp: {time.time():.2f}",
                 "id": str(i),
-                "event": "data"
+                "event": "data",
             }
 
             # Regular interval - important for detecting dead connections
@@ -93,7 +94,7 @@ async def sse_endpoint(request: Request):
     return EventSourceResponse(
         robust_stream(request),
         ping=5,  # Send ping every 5 seconds to detect dead connections
-        send_timeout=10.0  # Timeout sends after 10 seconds
+        send_timeout=10.0,  # Timeout sends after 10 seconds
     )
 
 
@@ -111,18 +112,19 @@ async def control_endpoint(request: Request):
     if "failure" in query:
         network_middleware.simulate_failure = query["failure"][0].lower() == "true"
 
-    return JSONResponse({
-        "network_delay": network_middleware.simulate_delay,
-        "delay_duration": network_middleware.delay_duration,
-        "network_failure": network_middleware.simulate_failure
-    })
+    return JSONResponse(
+        {
+            "network_delay": network_middleware.simulate_delay,
+            "delay_duration": network_middleware.delay_duration,
+            "network_failure": network_middleware.simulate_failure,
+        }
+    )
 
 
 # Create app with network simulation
-app = Starlette(routes=[
-    Route("/events", sse_endpoint),
-    Route("/control", control_endpoint)
-])
+app = Starlette(
+    routes=[Route("/events", sse_endpoint), Route("/control", control_endpoint)]
+)
 
 # Add network simulation middleware
 network_middleware = NetworkSimulationMiddleware(app)
@@ -158,7 +160,7 @@ class ResilientSSEClient:
 
                 if attempt < self.max_retries:
                     # Exponential backoff: 1s, 2s, 4s, 8s...
-                    delay = 2 ** attempt
+                    delay = 2**attempt
                     print(f"⏳ Retrying in {delay}s...")
                     await asyncio.sleep(delay)
                 else:
@@ -175,13 +177,16 @@ class ResilientSSEClient:
             print(f"📍 Resuming from event ID: {self.last_event_id}")
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            async with client.stream("GET", f"{self.base_url}/events", headers=headers) as response:
-
+            async with client.stream(
+                "GET", f"{self.base_url}/events", headers=headers
+            ) as response:
                 # Check response status
                 if response.status_code != 200:
-                    raise httpx.HTTPStatusError(f"HTTP {response.status_code}", request=None, response=response)
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {response.status_code}", request=None, response=response
+                    )
 
-                print(f"✅ Connected successfully")
+                print("✅ Connected successfully")
 
                 async for line in response.aiter_lines():
                     if line.strip():
@@ -211,7 +216,9 @@ async def demonstrate_network_issues():
 
         # Reset network conditions
         async with httpx.AsyncClient() as http_client:
-            await http_client.get("http://localhost:8000/control?delay=false&failure=false")
+            await http_client.get(
+                "http://localhost:8000/control?delay=false&failure=false"
+            )
 
         try:
             # Connect for 5 seconds
@@ -227,7 +234,9 @@ async def demonstrate_network_issues():
 
         # Enable network delay
         async with httpx.AsyncClient() as http_client:
-            await http_client.get("http://localhost:8000/control?delay=true&duration=3.0")
+            await http_client.get(
+                "http://localhost:8000/control?delay=true&duration=3.0"
+            )
 
         start_time = time.time()
 
@@ -296,5 +305,7 @@ if __name__ == "__main__":
         # Run server
         print("🚀 Starting network interruption test server...")
         print("📋 Run demo with: python network_interruption.py demo")
-        print("🎛️  Control network: curl 'http://localhost:8000/control?delay=true&duration=5'")
+        print(
+            "🎛️  Control network: curl 'http://localhost:8000/control?delay=true&duration=5'"
+        )
         uvicorn.run(app, host="localhost", port=8000, log_level="error")

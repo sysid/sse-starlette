@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff-format
+        files: ^(sse_starlette|tests)/
+      - id: ruff
+        args: [--fix]
+        files: ^(sse_starlette|tests)/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy --config-file pyproject.toml sse_starlette
+        language: system
+        types: [python]
+        files: ^sse_starlette/
+        pass_filenames: false
