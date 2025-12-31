@@ -1,0 +1,32 @@
+# Load test server image for sse-starlette
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install build dependencies and cleanup in one layer
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY pyproject.toml ./
+COPY README.md ./
+COPY sse_starlette ./sse_starlette
+
+# Install package with loadtest dependencies
+RUN pip install --no-cache-dir -e ".[loadtest]"
+
+# Install uvicorn for serving
+RUN pip install --no-cache-dir uvicorn
+
+# Copy load test server app
+COPY tests/load/server_app.py ./server_app.py
+
+# Expose port
+EXPOSE 8000
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Default command - run the load test server
+CMD ["uvicorn", "server_app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

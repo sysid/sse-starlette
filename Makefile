@@ -89,7 +89,7 @@ test: test-unit test-docker  ## run tests
 
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
-	RUN_ENV=local python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	RUN_ENV=local python -m pytest -m "not (integration or experimentation or loadtest)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
 
 .PHONY: test-docker
 test-docker:  ## test-docker (docker desktop: advanced settings)
@@ -98,6 +98,17 @@ test-docker:  ## test-docker (docker desktop: advanced settings)
 		RUN_ENV=local python -m pytest -m "integration" tests; \
 	else \
 		echo "Skipping tests: /var/run/docker.sock does not exist."; \
+	fi
+
+.PHONY: test-load
+test-load:  ## run load tests (requires docker, make test-load PYTEST_ARGS="--scale=500 --duration=5")
+	@if [ -S /var/run/docker.sock > /dev/null 2>&1 ]; then \
+		echo "Building load test image..."; \
+		docker build -f tests/Dockerfile.loadtest -t sse-starlette-loadtest:latest .; \
+		echo "Running load tests..."; \
+		RUN_ENV=local python -m pytest -m "loadtest" tests/load/ -v --tb=short $(PYTEST_ARGS); \
+	else \
+		echo "Skipping load tests: /var/run/docker.sock does not exist."; \
 	fi
 
 
