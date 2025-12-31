@@ -1,0 +1,76 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'Number of concurrent connections'
+        required: true
+        default: '100'
+        type: choice
+        options:
+          - '100'
+          - '500'
+          - '1000'
+      duration:
+        description: 'Test duration in minutes'
+        required: true
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '5'
+          - '10'
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e ".[loadtest]"
+
+      - name: Build load test Docker image
+        run: |
+          docker build -f tests/Dockerfile.loadtest -t sse-starlette-loadtest:latest .
+
+      - name: Run load tests
+        run: |
+          python -m pytest tests/load/ -m "loadtest" \
+            --scale=${{ inputs.scale }} \
+            --duration=${{ inputs.duration }} \
+            -v --tb=short \
+            --junitxml=load-test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: |
+            load-test-results.xml
+          retention-days: 30
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scale**: ${{ inputs.scale }} concurrent connections" >> $GITHUB_STEP_SUMMARY
+          echo "- **Duration**: ${{ inputs.duration }} minutes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f load-test-results.xml ]; then
+            echo "Test results uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          fi
