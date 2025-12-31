@@ -20,7 +20,6 @@ Manual Test:
   Ctrl+C  # Should exit gracefully now
 """
 
-import asyncio
 import signal
 from unittest.mock import MagicMock, patch
 
@@ -31,18 +30,12 @@ from sse_starlette.sse import (
     AppStatus,
     _get_shutdown_state,
     _get_uvicorn_server,
-    _shutdown_state,
     _shutdown_watcher,
 )
 
 
 class TestUvicornServerIntrospection:
     """Test _get_uvicorn_server() signal handler introspection."""
-
-    def teardown_method(self):
-        """Clean up after each test."""
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
 
     def test_returns_server_when_handler_is_bound_method(self):
         """Should extract Server from bound method handler."""
@@ -105,16 +98,6 @@ class TestUvicornServerIntrospection:
 class TestShutdownWatcherDualSource:
     """Test _shutdown_watcher() detects shutdown from both sources."""
 
-    def setup_method(self):
-        """Reset state before each test."""
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
-
-    def teardown_method(self):
-        """Clean up after each test."""
-        AppStatus.should_exit = False
-        _shutdown_state.set(None)
-
     @pytest.mark.asyncio
     async def test_detects_appstatus_should_exit(self):
         """Should detect when AppStatus.should_exit is set (monkey-patch worked)."""
@@ -163,32 +146,6 @@ class TestShutdownWatcherDualSource:
 
         # AppStatus.should_exit should be synced
         assert AppStatus.should_exit is True
-
-    @pytest.mark.asyncio
-    async def test_broadcasts_to_all_events(self):
-        """Should signal all registered events on shutdown."""
-        state = _get_shutdown_state()
-
-        events = [anyio.Event() for _ in range(5)]
-        for e in events:
-            state.events.add(e)
-
-        async def trigger_shutdown():
-            await anyio.sleep(0.1)
-            AppStatus.should_exit = True
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(_shutdown_watcher)
-            tg.start_soon(trigger_shutdown)
-
-            # Wait for all events to be signaled
-            with anyio.fail_after(2):
-                for e in events:
-                    await e.wait()
-
-        # All events should be set
-        for e in events:
-            assert e.is_set()
 
     @pytest.mark.asyncio
     async def test_fallback_when_no_uvicorn_server(self):

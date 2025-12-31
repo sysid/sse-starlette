@@ -25,6 +25,27 @@ logging.getLogger("urllib3").setLevel(logging.INFO)
 logging.getLogger("docker").setLevel(logging.INFO)
 
 
+@pytest.fixture(autouse=True)
+def reset_shutdown_state():
+    """Reset shutdown state before/after each test.
+
+    It ensures clean state for tests involving AppStatus and _shutdown_watcher.
+    """
+    from sse_starlette.sse import AppStatus, _thread_state
+
+    # Setup: clean state
+    AppStatus.should_exit = False
+    if hasattr(_thread_state, 'shutdown_state'):
+        del _thread_state.shutdown_state
+
+    yield
+
+    # Teardown: signal shutdown to kill any running watchers, then clean up
+    AppStatus.should_exit = True
+    if hasattr(_thread_state, 'shutdown_state'):
+        del _thread_state.shutdown_state
+
+
 @pytest.fixture
 def anyio_backend():
     """Exclude trio from tests"""
