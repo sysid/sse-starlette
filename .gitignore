@@ -1,4 +1,4 @@
-thoughts/
+thoughts
 .tox/
 report.xml
 coverage.xml
@@ -11,7 +11,7 @@ tags
 .mypy_cache/
 *.egg-info/
 __pycache__/
-venv/
+venv
 Pipfile.lock
 .envrc
 .pdm-python
