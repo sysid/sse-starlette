@@ -113,18 +113,6 @@ async def async_client() -> httpx.AsyncClient:
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Add custom command line options for load tests."""
     parser.addoption(
-        "--scale",
-        action="store",
-        default="100",
-        help="Number of concurrent connections for load tests",
-    )
-    parser.addoption(
-        "--duration",
-        action="store",
-        default="1",
-        help="Test duration in minutes",
-    )
-    parser.addoption(
         "--output-dir",
         action="store",
         default="tests/load/results",
@@ -155,18 +143,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=20,
         help="Percent change to trigger regression warning",
     )
-
-
-@pytest.fixture
-def scale(request: pytest.FixtureRequest) -> int:
-    """Get the scale (number of connections) for load tests."""
-    return int(request.config.getoption("--scale"))
-
-
-@pytest.fixture
-def duration_minutes(request: pytest.FixtureRequest) -> int:
-    """Get the duration in minutes for load tests."""
-    return int(request.config.getoption("--duration"))
 
 
 @pytest.fixture

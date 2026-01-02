@@ -13,6 +13,7 @@ over days/weeks in production, eventually causing OOM kills.
 from __future__ import annotations
 
 import asyncio
+import time
 
 import httpx
 import pytest
@@ -27,8 +28,6 @@ from .reporter import ReportGenerator
 @pytest.mark.loadtest
 async def test_memory_stability_under_load(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -55,7 +54,7 @@ async def test_memory_stability_under_load(
 
     ## Methodology
     1. Record baseline memory before any connections
-    2. Connect `scale` clients, each streaming for `duration_minutes`
+    2. Connect NUM_CLIENTS clients, each streaming for DURATION_SEC
     3. Sample memory periodically during streaming
     4. Compute total growth and growth rate (slope)
 
@@ -66,7 +65,10 @@ async def test_memory_stability_under_load(
       catching runaway leaks. The slope check catches slow leaks that might
       stay under the absolute threshold but indicate unbounded growth.
     """
-    events_per_client = duration_minutes * 60 * 10  # 10 events/sec
+    # Test parameters
+    NUM_CLIENTS = 100
+    DURATION_SEC = 60
+    EVENTS_PER_CLIENT = DURATION_SEC * 10  # 10 events/sec with 0.1s delay
 
     async def client_task(client_id: int) -> tuple[int, str | None]:
         """Single client consuming SSE events."""
@@ -78,7 +80,7 @@ async def test_memory_stability_under_load(
                 ) as source:
                     async for _ in source.aiter_sse():
                         events_received += 1
-                        if events_received >= events_per_client:
+                        if events_received >= EVENTS_PER_CLIENT:
                             break
             return events_received, None
         except Exception as e:
@@ -91,13 +93,13 @@ async def test_memory_stability_under_load(
     metrics_collector.set_memory_baseline(baseline_memory)
 
     # Start all clients
-    tasks = [asyncio.create_task(client_task(i)) for i in range(scale)]
+    start_time = time.perf_counter()
+    tasks = [asyncio.create_task(client_task(i)) for i in range(NUM_CLIENTS)]
 
-    # Sample memory periodically
-    sample_interval = max(10, duration_minutes * 6)  # At least 10 samples
-
-    for _ in range(sample_interval):
-        await asyncio.sleep(duration_minutes * 60 / sample_interval)
+    # Sample memory periodically (at least 10 samples)
+    num_samples = 10
+    for _ in range(num_samples):
+        await asyncio.sleep(DURATION_SEC / num_samples)
         try:
             async with httpx.AsyncClient() as client:
                 metrics = (await client.get(f"{sse_server_url}/metrics")).json()
@@ -107,6 +109,7 @@ async def test_memory_stability_under_load(
 
     # Wait for all clients to complete
     results = await asyncio.gather(*tasks, return_exceptions=True)
+    elapsed = time.perf_counter() - start_time
 
     # Process results
     for result in results:
@@ -127,13 +130,12 @@ async def test_memory_stability_under_load(
     metrics_collector.set_memory_final(final_memory)
 
     # Set duration
-    metrics_collector.set_duration(duration_minutes * 60)
+    metrics_collector.set_duration(elapsed)
 
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_memory_stability_under_load",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -154,8 +156,8 @@ async def test_memory_stability_under_load(
     # Original assertions
     completed = metrics_collector.successful_connections
     assert (
-        completed >= scale * 0.9
-    ), f"Too many failed connections: {completed}/{scale} completed"
+        completed >= NUM_CLIENTS * 0.9
+    ), f"Too many failed connections: {completed}/{NUM_CLIENTS} completed"
 
     if report.memory:
         assert report.memory.growth_mb < 50, (
@@ -172,8 +174,6 @@ async def test_memory_stability_under_load(
 @pytest.mark.loadtest
 async def test_memory_returns_to_baseline_after_disconnect(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -200,7 +200,7 @@ async def test_memory_returns_to_baseline_after_disconnect(
 
     ## Methodology
     1. Record baseline memory
-    2. Connect clients in batches, each receiving 50 events then disconnecting
+    2. Connect clients in batches, each receiving EVENTS_PER_CLIENT events then disconnecting
     3. Wait 2 seconds for cleanup (GC, finalizers)
     4. Record final memory and compare to baseline
 
@@ -210,6 +210,10 @@ async def test_memory_returns_to_baseline_after_disconnect(
       immediately. 20% margin accounts for fragmentation and GC timing while
       still catching significant retention issues.
     """
+    # Test parameters
+    NUM_CLIENTS = 100
+    EVENTS_PER_CLIENT = 50
+    BATCH_SIZE = 100
 
     async def client_task(client_id: int) -> tuple[int, str | None]:
         """Client that connects, receives few events, then disconnects."""
@@ -221,7 +225,7 @@ async def test_memory_returns_to_baseline_after_disconnect(
                     count = 0
                     async for _ in source.aiter_sse():
                         count += 1
-                        if count >= 50:
+                        if count >= EVENTS_PER_CLIENT:
                             break
             return count, None
         except Exception as e:
@@ -233,10 +237,12 @@ async def test_memory_returns_to_baseline_after_disconnect(
     baseline_memory = baseline["memory_rss_mb"]
     metrics_collector.set_memory_baseline(baseline_memory)
 
+    start_time = time.perf_counter()
+
     # Connect and disconnect clients in batches
-    batch_size = min(100, scale)
-    for batch_start in range(0, scale, batch_size):
-        batch_end = min(batch_start + batch_size, scale)
+    batch_size = min(BATCH_SIZE, NUM_CLIENTS)
+    for batch_start in range(0, NUM_CLIENTS, batch_size):
+        batch_end = min(batch_start + batch_size, NUM_CLIENTS)
         tasks = [
             asyncio.create_task(client_task(i)) for i in range(batch_start, batch_end)
         ]
@@ -264,17 +270,19 @@ async def test_memory_returns_to_baseline_after_disconnect(
     # Wait for cleanup
     await asyncio.sleep(2)
 
+    elapsed = time.perf_counter() - start_time
+
     # Check memory returned to near baseline
     async with httpx.AsyncClient() as client:
         final = (await client.get(f"{sse_server_url}/metrics")).json()
     final_memory = final["memory_rss_mb"]
     metrics_collector.set_memory_final(final_memory)
+    metrics_collector.set_duration(elapsed)
 
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_memory_returns_to_baseline_after_disconnect",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -303,8 +311,6 @@ async def test_memory_returns_to_baseline_after_disconnect(
 @pytest.mark.loadtest
 async def test_event_set_cleanup(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -332,18 +338,21 @@ async def test_event_set_cleanup(
 
     ## Methodology
     1. Record baseline `registered_events` count
-    2. Connect `scale` clients, wait for connections to establish
-    3. Record peak `registered_events` (should be >= scale * 0.2)
+    2. Connect NUM_CLIENTS clients, wait for connections to establish
+    3. Record peak `registered_events` (should be >= NUM_CLIENTS * 0.2)
     4. Wait for all connections to close + 2s cleanup
     5. Record final `registered_events` (should return near baseline)
 
     ## Pass Criteria
-    - Peak events >= scale * 0.2 (events were registered)
+    - Peak events >= NUM_CLIENTS * 0.2 (events were registered)
     - Final events <= baseline + 10 (events were cleaned up)
     - Rationale: We expect most (not all) connections to register events.
       After cleanup, the set should be nearly empty. The +10 margin allows
       for concurrent test interference.
     """
+    # Test parameters
+    NUM_CLIENTS = 100
+    EVENTS_PER_CLIENT = 5
 
     connected = asyncio.Event()
     connection_count = 0
@@ -356,12 +365,12 @@ async def test_event_set_cleanup(
                     client, "GET", f"{sse_server_url}/sse?delay=0.5"
                 ) as source:
                     connection_count += 1
-                    if connection_count >= scale * 0.5:
+                    if connection_count >= NUM_CLIENTS * 0.5:
                         connected.set()
                     count = 0
                     async for _ in source.aiter_sse():
                         count += 1
-                        if count >= 5:  # Stay connected for ~2.5s
+                        if count >= EVENTS_PER_CLIENT:  # Stay connected for ~2.5s
                             break
             return count, None
         except Exception as e:
@@ -374,8 +383,10 @@ async def test_event_set_cleanup(
     baseline_memory = baseline["memory_rss_mb"]
     metrics_collector.set_memory_baseline(baseline_memory)
 
+    start_time = time.perf_counter()
+
     # Connect many clients
-    tasks = [asyncio.create_task(client_task()) for _ in range(scale)]
+    tasks = [asyncio.create_task(client_task()) for _ in range(NUM_CLIENTS)]
 
     # Wait for connections to establish (with timeout)
     try:
@@ -406,11 +417,14 @@ async def test_event_set_cleanup(
 
     await asyncio.sleep(2)  # Allow cleanup time
 
+    elapsed = time.perf_counter() - start_time
+
     # Check events cleaned up
     async with httpx.AsyncClient() as client:
         final = (await client.get(f"{sse_server_url}/metrics")).json()
     final_events = final["registered_events"]
     metrics_collector.set_memory_final(final["memory_rss_mb"])
+    metrics_collector.set_duration(elapsed)
 
     # Record SSE internals
     metrics_collector.set_sse_internals(
@@ -422,8 +436,7 @@ async def test_event_set_cleanup(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_event_set_cleanup",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -442,8 +455,8 @@ async def test_event_set_cleanup(
         pytest.fail(f"Regression detected: {comparison.regression_reasons}")
 
     # Original assertions
-    assert peak_events >= scale * 0.2, (
-        f"Expected at least {scale * 0.2} events registered during peak, "
+    assert peak_events >= NUM_CLIENTS * 0.2, (
+        f"Expected at least {NUM_CLIENTS * 0.2} events registered during peak, "
         f"got {peak_events}"
     )
     assert final_events <= baseline_events + 10, (

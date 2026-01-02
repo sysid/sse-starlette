@@ -28,8 +28,6 @@ from .reporter import ReportGenerator
 @pytest.mark.loadtest
 async def test_slow_clients_dont_block_fast_clients(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -54,9 +52,9 @@ async def test_slow_clients_dont_block_fast_clients(
     making the server unusable under mixed load.
 
     ## Methodology
-    1. Connect 10 "fast" clients (consume events immediately)
-    2. Connect 10 "slow" clients (sleep 0.5s after each event)
-    3. Run for 10 seconds
+    1. Connect NUM_FAST "fast" clients (consume events immediately)
+    2. Connect NUM_SLOW "slow" clients (sleep 0.5s after each event)
+    3. Run for DURATION_SEC seconds
     4. Compare event counts
 
     ## Pass Criteria
@@ -66,7 +64,10 @@ async def test_slow_clients_dont_block_fast_clients(
       Slow clients receive ~20 (10s / 0.5s). 5x ratio is conservative.
       500 events threshold catches severe throttling.
     """
-    test_duration = 10  # seconds
+    # Test parameters
+    NUM_FAST = 10
+    NUM_SLOW = 10
+    DURATION_SEC = 10
 
     async def fast_client() -> tuple[int, str | None]:
         """Client that consumes events as fast as possible."""
@@ -79,7 +80,7 @@ async def test_slow_clients_dont_block_fast_clients(
                 ) as source:
                     async for _ in source.aiter_sse():
                         count += 1
-                        if time.perf_counter() - start >= test_duration:
+                        if time.perf_counter() - start >= DURATION_SEC:
                             break
             return count, None
         except Exception as e:
@@ -97,7 +98,7 @@ async def test_slow_clients_dont_block_fast_clients(
                     async for _ in source.aiter_sse():
                         await asyncio.sleep(0.5)  # Slow processing
                         count += 1
-                        if time.perf_counter() - start >= test_duration:
+                        if time.perf_counter() - start >= DURATION_SEC:
                             break
             return count, None
         except Exception as e:
@@ -106,8 +107,8 @@ async def test_slow_clients_dont_block_fast_clients(
     start_time = time.perf_counter()
 
     # Mix of fast and slow clients
-    fast_tasks = [asyncio.create_task(fast_client()) for _ in range(10)]
-    slow_tasks = [asyncio.create_task(slow_client()) for _ in range(10)]
+    fast_tasks = [asyncio.create_task(fast_client()) for _ in range(NUM_FAST)]
+    slow_tasks = [asyncio.create_task(slow_client()) for _ in range(NUM_SLOW)]
 
     fast_results = await asyncio.gather(*fast_tasks)
     slow_results = await asyncio.gather(*slow_tasks)
@@ -145,8 +146,7 @@ async def test_slow_clients_dont_block_fast_clients(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_slow_clients_dont_block_fast_clients",
-        scale=20,  # 10 fast + 10 slow
-        duration_minutes=duration_minutes,
+        scale=NUM_FAST + NUM_SLOW,
     )
     register_test_report(report)
 
@@ -177,8 +177,6 @@ async def test_slow_clients_dont_block_fast_clients(
 @pytest.mark.loadtest
 async def test_connection_churn_stability(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -204,7 +202,7 @@ async def test_connection_churn_stability(
 
     ## Methodology
     1. Record baseline FDs and memory
-    2. Create `churn_rate` connections per second for 30 seconds
+    2. Create CHURN_RATE connections per second for DURATION_SEC seconds
     3. Each connection receives one event and disconnects
     4. Sample memory every 5 seconds
     5. Record final FDs and memory
@@ -217,9 +215,11 @@ async def test_connection_churn_stability(
       100MB memory is generous but catches runaway allocation.
       90% success rate accounts for expected failures under heavy churn.
     """
-    churn_rate = min(100, scale)  # connections per second
-    duration = 30  # seconds
-    total_connections = churn_rate * duration
+    # Test parameters
+    CHURN_RATE = 100  # connections per second
+    DURATION_SEC = 30
+
+    total_connections = CHURN_RATE * DURATION_SEC
 
     async def quick_connection() -> tuple[bool, str | None]:
         try:
@@ -245,8 +245,8 @@ async def test_connection_churn_stability(
 
     # Create connections at target rate
     successful = 0
-    for batch in range(duration):
-        tasks = [asyncio.create_task(quick_connection()) for _ in range(churn_rate)]
+    for batch in range(DURATION_SEC):
+        tasks = [asyncio.create_task(quick_connection()) for _ in range(CHURN_RATE)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
@@ -285,8 +285,7 @@ async def test_connection_churn_stability(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_connection_churn_stability",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=total_connections,
     )
     register_test_report(report)
 
@@ -327,8 +326,6 @@ async def test_connection_churn_stability(
 @pytest.mark.loadtest
 async def test_send_timeout_under_load(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -354,8 +351,8 @@ async def test_send_timeout_under_load(
     "freeze" (backgrounded, network change) without closing connections.
 
     ## Methodology
-    1. Connect 5 "frozen" clients (receive one event, then stop reading)
-    2. Connect 3 "normal" clients (receive 50 events normally)
+    1. Connect NUM_FROZEN "frozen" clients (receive one event, then stop reading)
+    2. Connect NUM_NORMAL "normal" clients (receive EVENTS_PER_NORMAL events normally)
     3. Wait for normal clients to complete
     4. Verify normal clients weren't affected
 
@@ -365,6 +362,10 @@ async def test_send_timeout_under_load(
       small margin for timing. If frozen clients blocked the server,
       normal clients would timeout or receive far fewer events.
     """
+    # Test parameters
+    NUM_FROZEN = 5
+    NUM_NORMAL = 3
+    EVENTS_PER_NORMAL = 50
 
     async def frozen_client() -> tuple[str, float, str | None]:
         """Client that stops reading after first event (simulates frozen client)."""
@@ -385,7 +386,7 @@ async def test_send_timeout_under_load(
         return "completed", time.perf_counter() - start, None
 
     # Start some frozen clients (server has default send_timeout)
-    frozen_tasks = [asyncio.create_task(frozen_client()) for _ in range(5)]
+    frozen_tasks = [asyncio.create_task(frozen_client()) for _ in range(NUM_FROZEN)]
 
     # Also verify server remains responsive with normal clients
     async def normal_client() -> tuple[int, str | None]:
@@ -397,13 +398,13 @@ async def test_send_timeout_under_load(
                 ) as source:
                     async for _ in source.aiter_sse():
                         count += 1
-                        if count >= 50:
+                        if count >= EVENTS_PER_NORMAL:
                             break
             return count, None
         except Exception as e:
             return count, str(e)
 
-    normal_tasks = [asyncio.create_task(normal_client()) for _ in range(3)]
+    normal_tasks = [asyncio.create_task(normal_client()) for _ in range(NUM_NORMAL)]
 
     # Wait for normal clients to complete
     normal_results = await asyncio.gather(*normal_tasks)
@@ -441,8 +442,7 @@ async def test_send_timeout_under_load(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_send_timeout_under_load",
-        scale=8,  # 5 frozen + 3 normal
-        duration_minutes=duration_minutes,
+        scale=NUM_FROZEN + NUM_NORMAL,
     )
     register_test_report(report)
 
@@ -460,7 +460,8 @@ async def test_send_timeout_under_load(
     if fail_on_regression and comparison and comparison.regression_detected:
         pytest.fail(f"Regression detected: {comparison.regression_reasons}")
 
-    # Original assertion
+    # TODO: fix percentage
+    min_expected = EVENTS_PER_NORMAL - 5  # Allow 10% margin
     assert all(
-        r >= 45 for r in normal_counts
+        r >= min_expected for r in normal_counts
     ), f"Normal clients affected by frozen clients: {normal_counts}"

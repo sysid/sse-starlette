@@ -3,24 +3,6 @@ name: Load Tests
 on:
   workflow_dispatch:
     inputs:
-      scale:
-        description: 'Number of concurrent connections'
-        required: true
-        default: '100'
-        type: choice
-        options:
-          - '100'
-          - '500'
-          - '1000'
-      duration:
-        description: 'Test duration in minutes'
-        required: true
-        default: '1'
-        type: choice
-        options:
-          - '1'
-          - '5'
-          - '10'
       update_baseline:
         description: 'Update baselines after run'
         required: false
@@ -59,8 +41,6 @@ jobs:
       - name: Run load tests
         run: |
           python -m pytest tests/load/ -m "loadtest" \
-            --scale=${{ inputs.scale }} \
-            --duration=${{ inputs.duration }} \
             --output-dir=tests/load/results \
             ${{ inputs.update_baseline && '--update-baseline' || '' }} \
             ${{ inputs.fail_on_regression && '--fail-on-regression' || '' }} \
@@ -91,8 +71,6 @@ jobs:
         run: |
           echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Scale**: ${{ inputs.scale }} concurrent connections" >> $GITHUB_STEP_SUMMARY
-          echo "- **Duration**: ${{ inputs.duration }} minutes" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Reports" >> $GITHUB_STEP_SUMMARY

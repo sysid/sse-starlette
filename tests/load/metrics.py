@@ -345,9 +345,7 @@ class MetricsCollector:
         self.peak_registered_events = peak_events
         self.final_registered_events = final_events
 
-    def compute_report(
-        self, test_name: str, scale: int, duration_minutes: int
-    ) -> TestReport:
+    def compute_report(self, test_name: str, scale: int) -> TestReport:
         """Compute final report from collected samples."""
         git_commit, git_branch = _get_git_info()
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -405,6 +403,9 @@ class MetricsCollector:
                 peak_registered_events=self.peak_registered_events,
                 final_registered_events=self.final_registered_events,
             )
+
+        # Compute duration_minutes from actual test duration
+        duration_minutes = max(1, int(self.total_duration_sec / 60))
 
         return TestReport(
             test_name=test_name,
