@@ -30,8 +30,6 @@ from .reporter import ReportGenerator
 @pytest.mark.loadtest
 async def test_graceful_shutdown_with_active_connections(
     docker_available: bool,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -60,7 +58,7 @@ async def test_graceful_shutdown_with_active_connections(
 
     ## Methodology
     1. Start server in Docker container
-    2. Connect `scale` concurrent SSE clients
+    2. Connect NUM_CLIENTS concurrent SSE clients
     3. Wait for connections to establish (~2s)
     4. Send SIGTERM to container
     5. Measure time until all connections close
@@ -72,6 +70,9 @@ async def test_graceful_shutdown_with_active_connections(
     - Rationale: 90% accounts for race conditions in test timing. 10s is
       generous but catches hangs. Production should complete in <5s.
     """
+    # Test parameters
+    NUM_CLIENTS = 100
+
     if not docker_available:
         pytest.skip("Docker not available")
 
@@ -114,7 +115,7 @@ async def test_graceful_shutdown_with_active_connections(
             return f"error:{type(e).__name__}", str(e)
 
     # Start clients
-    tasks = [asyncio.create_task(client_task()) for _ in range(scale)]
+    tasks = [asyncio.create_task(client_task()) for _ in range(NUM_CLIENTS)]
 
     # Wait for connections to establish
     await asyncio.sleep(2)
@@ -169,8 +170,7 @@ async def test_graceful_shutdown_with_active_connections(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_graceful_shutdown_with_active_connections",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -191,16 +191,14 @@ async def test_graceful_shutdown_with_active_connections(
     # Original assertions
     total_closed = clean_closes + server_closes + errors
     assert (
-        total_closed >= scale * 0.9
-    ), f"Not all connections closed: {total_closed}/{scale}"
+        total_closed >= NUM_CLIENTS * 0.9
+    ), f"Not all connections closed: {total_closed}/{NUM_CLIENTS}"
     assert shutdown_time < 10, f"Shutdown took {shutdown_time:.1f}s, expected < 10s"
 
 
 @pytest.mark.loadtest
 async def test_connections_receive_shutdown_signal(
     docker_available: bool,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -227,7 +225,7 @@ async def test_connections_receive_shutdown_signal(
 
     ## Methodology
     1. Start server in Docker container
-    2. Connect 10 clients to /sse?delay=0.5 (slow stream to keep connections active)
+    2. Connect NUM_CLIENTS clients to /sse?delay=0.5 (slow stream to keep connections active)
     3. Wait 3s for clients to receive events
     4. Send SIGTERM
     5. Wait for clients to notice stream end
@@ -240,6 +238,10 @@ async def test_connections_receive_shutdown_signal(
       reached 20, they weren't interrupted. This proves the shutdown signal
       propagated through the watcher to active streams.
     """
+    # Test parameters
+    NUM_CLIENTS = 10
+    MAX_EVENTS_PER_CLIENT = 20
+
     if not docker_available:
         pytest.skip("Docker not available")
 
@@ -261,13 +263,13 @@ async def test_connections_receive_shutdown_signal(
                 ) as source:
                     async for _ in source.aiter_sse():
                         count += 1
-                        if count >= 20:  # Should not reach this
+                        if count >= MAX_EVENTS_PER_CLIENT:  # Should not reach this
                             break
             return count, None
         except Exception as e:
             return count, str(e)
 
-    tasks = [asyncio.create_task(client_task()) for _ in range(10)]
+    tasks = [asyncio.create_task(client_task()) for _ in range(NUM_CLIENTS)]
 
     # Let them receive a few events
     await asyncio.sleep(3)
@@ -311,8 +313,7 @@ async def test_connections_receive_shutdown_signal(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_connections_receive_shutdown_signal",
-        scale=10,  # Fixed scale for this test
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -333,5 +334,5 @@ async def test_connections_receive_shutdown_signal(
     # Original assertions
     assert total_events > 0, "Clients should have received events before shutdown"
     assert all(
-        c < 20 for c in event_counts
+        c < MAX_EVENTS_PER_CLIENT for c in event_counts
     ), "Clients should have been interrupted by shutdown"

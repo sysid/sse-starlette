@@ -15,6 +15,7 @@ verify that pattern holds under various load conditions:
 from __future__ import annotations
 
 import asyncio
+import time
 
 import httpx
 import pytest
@@ -29,8 +30,6 @@ from .reporter import ReportGenerator
 @pytest.mark.loadtest
 async def test_single_watcher_with_many_connections(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -42,7 +41,7 @@ async def test_single_watcher_with_many_connections(
 
     ## What is Measured
     - `watcher_started` flag from /metrics (True = watcher exists)
-    - `registered_events` count (should be >= scale * 0.5)
+    - `registered_events` count (should be >= NUM_CLIENTS * 0.5)
     - Implicit: CPU usage would spike if multiple watchers existed (not measured)
 
     ## Why This Matters
@@ -57,18 +56,21 @@ async def test_single_watcher_with_many_connections(
     - Constant CPU overhead regardless of connection count
 
     ## Methodology
-    1. Connect `scale` concurrent clients (default 100)
+    1. Connect NUM_CLIENTS concurrent clients
     2. Wait for connections to establish (~2s)
     3. Query /metrics for watcher_started and registered_events
     4. Cancel all connections
 
     ## Pass Criteria
     - watcher_started = True (watcher exists for active connections)
-    - registered_events >= scale * 0.5 (most connections registered)
+    - registered_events >= NUM_CLIENTS * 0.5 (most connections registered)
     - Rationale: watcher_started=True confirms the mechanism works.
       Event count verifies registration worked. We don't directly measure
       watcher count, but CPU metrics in CI would catch proliferation.
     """
+    # Test parameters
+    NUM_CLIENTS = 100
+    HOLD_DURATION_SEC = 5
 
     async def client_task() -> tuple[int, str | None]:
         try:
@@ -77,14 +79,16 @@ async def test_single_watcher_with_many_connections(
                     client, "GET", f"{sse_server_url}/sse?delay=0.1"
                 ) as source:
                     async for _ in source.aiter_sse():
-                        await asyncio.sleep(5)  # Stay connected
+                        await asyncio.sleep(HOLD_DURATION_SEC)  # Stay connected
                         break
             return 1, None
         except Exception as e:
             return 0, str(e)
 
+    start_time = time.perf_counter()
+
     # Start many connections
-    tasks = [asyncio.create_task(client_task()) for _ in range(scale)]
+    tasks = [asyncio.create_task(client_task()) for _ in range(NUM_CLIENTS)]
 
     # Wait for connections to establish
     await asyncio.sleep(2)
@@ -101,6 +105,9 @@ async def test_single_watcher_with_many_connections(
     for task in tasks:
         task.cancel()
     results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    elapsed = time.perf_counter() - start_time
+    metrics_collector.set_duration(elapsed)
 
     # Process results
     for result in results:
@@ -123,8 +130,7 @@ async def test_single_watcher_with_many_connections(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_single_watcher_with_many_connections",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -145,15 +151,13 @@ async def test_single_watcher_with_many_connections(
     # Original assertions
     assert watcher_started is True, "Watcher should be started with active connections"
     assert (
-        registered_events >= scale * 0.5
-    ), f"Expected at least {scale * 0.5} events, got {registered_events}"
+        registered_events >= NUM_CLIENTS * 0.5
+    ), f"Expected at least {NUM_CLIENTS * 0.5} events, got {registered_events}"
 
 
 @pytest.mark.loadtest
 async def test_rapid_connect_disconnect_watcher_stability(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -178,7 +182,7 @@ async def test_rapid_connect_disconnect_watcher_stability(
     connections closed quickly, watchers accumulated and never stopped.
 
     ## Methodology
-    1. Run `scale / 10` batches of 10 quick connections each
+    1. Run NUM_BATCHES batches of BATCH_SIZE quick connections each
     2. Each connection receives 1 event and disconnects immediately
     3. After all batches, check thread count and watcher status
 
@@ -188,6 +192,9 @@ async def test_rapid_connect_disconnect_watcher_stability(
       accumulated, we'd see hundreds of threads (one per watcher task).
       50 provides margin for legitimate worker threads.
     """
+    # Test parameters
+    NUM_BATCHES = 10
+    BATCH_SIZE = 10
 
     async def quick_connect() -> tuple[int, str | None]:
         try:
@@ -201,9 +208,11 @@ async def test_rapid_connect_disconnect_watcher_stability(
         except Exception as e:
             return 0, str(e)
 
+    start_time = time.perf_counter()
+
     # Rapid connect/disconnect cycles
-    for batch in range(scale // 10):
-        tasks = [asyncio.create_task(quick_connect()) for _ in range(10)]
+    for _ in range(NUM_BATCHES):
+        tasks = [asyncio.create_task(quick_connect()) for _ in range(BATCH_SIZE)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
@@ -219,6 +228,9 @@ async def test_rapid_connect_disconnect_watcher_stability(
 
     # Brief pause
     await asyncio.sleep(0.5)
+
+    elapsed = time.perf_counter() - start_time
+    metrics_collector.set_duration(elapsed)
 
     # Check metrics - watcher should still be singular
     async with httpx.AsyncClient() as client:
@@ -237,8 +249,7 @@ async def test_rapid_connect_disconnect_watcher_stability(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_rapid_connect_disconnect_watcher_stability",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_BATCHES * BATCH_SIZE,
     )
     register_test_report(report)
 
@@ -263,8 +274,6 @@ async def test_rapid_connect_disconnect_watcher_stability(
 @pytest.mark.loadtest
 async def test_watcher_cleanup_allows_restart(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -290,10 +299,10 @@ async def test_watcher_cleanup_allows_restart(
     connections won't receive shutdown signals, causing graceful shutdown to fail.
 
     ## Methodology
-    1. Phase 1: Connect 50 clients, each receives 20 events, then disconnects
+    1. Phase 1: Connect CLIENTS_PER_PHASE clients, each receives EVENTS_PER_CLIENT events, then disconnects
     2. Wait 1s for cleanup
     3. Check registered_events (should be near 0)
-    4. Phase 2: Connect 50 new clients, each receives 20 events
+    4. Phase 2: Connect CLIENTS_PER_PHASE new clients, each receives EVENTS_PER_CLIENT events
     5. Wait 1s for cleanup
     6. Verify final state matches Phase 1 post-cleanup
 
@@ -304,6 +313,9 @@ async def test_watcher_cleanup_allows_restart(
     - Rationale: If watcher didn't restart in Phase 2, no events would be
       delivered. The +5 margin allows for concurrent test interference.
     """
+    # Test parameters
+    CLIENTS_PER_PHASE = 50
+    EVENTS_PER_CLIENT = 20
 
     async def connect_and_consume(n_events: int) -> tuple[int, str | None]:
         count = 0
@@ -320,8 +332,13 @@ async def test_watcher_cleanup_allows_restart(
         except Exception as e:
             return count, str(e)
 
+    start_time = time.perf_counter()
+
     # Phase 1: Connect, consume, disconnect
-    tasks = [asyncio.create_task(connect_and_consume(20)) for _ in range(50)]
+    tasks = [
+        asyncio.create_task(connect_and_consume(EVENTS_PER_CLIENT))
+        for _ in range(CLIENTS_PER_PHASE)
+    ]
     results = await asyncio.gather(*tasks)
 
     phase1_events = 0
@@ -345,7 +362,10 @@ async def test_watcher_cleanup_allows_restart(
     metrics_collector.add_memory_sample(metrics1["memory_rss_mb"])
 
     # Phase 2: New connections should work
-    tasks = [asyncio.create_task(connect_and_consume(20)) for _ in range(50)]
+    tasks = [
+        asyncio.create_task(connect_and_consume(EVENTS_PER_CLIENT))
+        for _ in range(CLIENTS_PER_PHASE)
+    ]
     results = await asyncio.gather(*tasks)
 
     phase2_events = 0
@@ -361,6 +381,9 @@ async def test_watcher_cleanup_allows_restart(
 
     # Wait for cleanup
     await asyncio.sleep(1)
+
+    elapsed = time.perf_counter() - start_time
+    metrics_collector.set_duration(elapsed)
 
     # Verify clean state
     async with httpx.AsyncClient() as client:
@@ -379,8 +402,7 @@ async def test_watcher_cleanup_allows_restart(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_watcher_cleanup_allows_restart",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=CLIENTS_PER_PHASE * 2,
     )
     register_test_report(report)
 

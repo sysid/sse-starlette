@@ -17,9 +17,6 @@ These tests measure performance characteristics that unit tests cannot capture:
 # Run load tests locally (requires Docker)
 make test-load
 
-# Run with custom scale
-make test-load PYTEST_ARGS="--scale=500 --duration=5"
-
 # Update baselines after intentional changes
 make test-load PYTEST_ARGS="--update-baseline"
 ```
@@ -105,13 +102,14 @@ make test-load PYTEST_ARGS="--fail-on-regression"
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--scale` | 100 | Concurrent connections |
-| `--duration` | 1 | Test duration (minutes) |
 | `--output-dir` | `tests/load/results` | Report output directory |
 | `--baselines-dir` | `tests/load/baselines` | Baseline file directory |
 | `--update-baseline` | False | Save current run as new baseline |
 | `--fail-on-regression` | False | Exit non-zero if regression detected |
 | `--regression-threshold` | 20 | Percent change to trigger warning |
+
+**Note**: Test scale (connections, duration) is controlled via constants within each test file.
+This allows appropriate parameters per test type (e.g., shutdown tests use fewer connections).
 
 ## Test Categories
 
@@ -219,10 +217,48 @@ Features:
 - Comparison against baseline with delta percentages
 - Regression/warning highlights
 
+## Server Metrics Endpoint
+
+The load test server exposes `/metrics` for monitoring:
+
+```json
+{
+  "memory_rss_mb": 45.2,
+  "num_fds": 25,
+  "num_threads": 8,
+  "watcher_started": true,
+  "registered_events": 100,
+  "uptime_seconds": 30.5
+}
+```
+
+Key metrics:
+- `memory_rss_mb`: Detect memory leaks
+- `registered_events`: Verify Issue #152 (should equal active connections)
+- `watcher_started`: Confirm single watcher pattern
+- `num_fds`: Detect file descriptor leaks
+
+## Dependencies
+
+Added to `pyproject.toml` as optional `[loadtest]` group:
+
+```bash
+pip install -e ".[loadtest]"
+```
+
 ## GitHub Actions Integration
 
 The workflow (`.github/workflows/load-test.yml`) supports:
-- Manual trigger with scale/duration inputs
+- Manual trigger via workflow_dispatch
 - Baseline update option
 - Regression detection for CI gates
 - Artifact upload for reports
+
+## Design Decisions
+
+| Choice | Rationale |
+|--------|-----------|
+| httpx-sse + asyncio | Native async SSE client, simple concurrency with asyncio.gather() |
+| Docker containers | Isolated environment, reproducible, clean SIGTERM shutdown |
+| Manual CI trigger | Load tests are resource-intensive, not suitable for every PR |
+| psutil for metrics | Cross-platform, no infrastructure needed, real-time data |

@@ -28,8 +28,6 @@ from .reporter import ReportGenerator
 @pytest.mark.loadtest
 async def test_throughput_single_client(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -60,9 +58,11 @@ async def test_throughput_single_client(
       scheduling. 1000 events/sec is achievable on any modern system and leaves
       headroom for real-world latency.
     """
+    # Test parameters
+    DURATION_SEC = 10
+
     events_received = 0
     start_time = time.perf_counter()
-    duration_seconds = 10
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         async with aconnect_sse(
@@ -70,7 +70,7 @@ async def test_throughput_single_client(
         ) as source:
             async for _ in source.aiter_sse():
                 events_received += 1
-                if time.perf_counter() - start_time >= duration_seconds:
+                if time.perf_counter() - start_time >= DURATION_SEC:
                     break
 
     elapsed = time.perf_counter() - start_time
@@ -84,8 +84,7 @@ async def test_throughput_single_client(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_throughput_single_client",
-        scale=1,  # Single client test
-        duration_minutes=duration_minutes,
+        scale=1,
     )
     register_test_report(report)
 
@@ -113,8 +112,6 @@ async def test_throughput_single_client(
 @pytest.mark.loadtest
 async def test_throughput_multiple_clients(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -137,18 +134,19 @@ async def test_throughput_multiple_clients(
     - Event loop blocking under concurrent I/O
 
     ## Methodology
-    1. Launch `scale` concurrent client tasks (default 100)
+    1. Launch NUM_CLIENTS concurrent client tasks
     2. Each client connects to /sse?delay=0.001 (1ms between events)
-    3. Run for 30 seconds, counting events per client
+    3. Run for DURATION_SEC seconds, counting events per client
     4. Sum total events and calculate aggregate throughput
 
     ## Pass Criteria
-    - Aggregate throughput >= min(10000, scale * 100) events/sec
+    - Aggregate throughput >= min(10000, NUM_CLIENTS * 100) events/sec
     - Rationale: With 1ms delay, each client should receive ~1000 events/sec.
-      With 100 clients, expect ~100K events/sec total. The min() handles
-      smaller scale values gracefully.
+      With 100 clients, expect ~100K events/sec total.
     """
-    duration_seconds = 30
+    # Test parameters
+    NUM_CLIENTS = 100
+    DURATION_SEC = 30
 
     async def client_task() -> tuple[int, str | None]:
         """Run client and return (event_count, error_or_none)."""
@@ -161,14 +159,14 @@ async def test_throughput_multiple_clients(
                 ) as source:
                     async for _ in source.aiter_sse():
                         count += 1
-                        if time.perf_counter() - start >= duration_seconds:
+                        if time.perf_counter() - start >= DURATION_SEC:
                             break
             return count, None
         except Exception as e:
             return count, str(e)
 
     start_time = time.perf_counter()
-    tasks = [asyncio.create_task(client_task()) for _ in range(scale)]
+    tasks = [asyncio.create_task(client_task()) for _ in range(NUM_CLIENTS)]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     elapsed = time.perf_counter() - start_time
 
@@ -191,8 +189,7 @@ async def test_throughput_multiple_clients(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_throughput_multiple_clients",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -212,9 +209,9 @@ async def test_throughput_multiple_clients(
 
     # Original assertion
     aggregate_throughput = total_events / elapsed
-    min_expected = min(10000, scale * 100)
+    min_expected = min(10000, NUM_CLIENTS * 100)
     assert aggregate_throughput >= min_expected, (
-        f"Aggregate throughput {aggregate_throughput:.0f} events/sec with {scale} "
+        f"Aggregate throughput {aggregate_throughput:.0f} events/sec with {NUM_CLIENTS} "
         f"clients, expected >= {min_expected}"
     )
 
@@ -222,8 +219,6 @@ async def test_throughput_multiple_clients(
 @pytest.mark.loadtest
 async def test_first_event_latency(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -249,7 +244,7 @@ async def test_first_event_latency(
     - Inefficient task group initialization
 
     ## Methodology
-    1. Launch `scale` concurrent connection attempts simultaneously
+    1. Launch NUM_CLIENTS concurrent connection attempts simultaneously
     2. Each client measures time from connect() to first SSE event
     3. Collect latency samples and compute percentiles
 
@@ -257,8 +252,9 @@ async def test_first_event_latency(
     - p50 < 1250ms, p99 < 2500ms
     - Calibrated from measured p50=932ms, p99=1779ms at scale=100
     - Threshold factor: 1.3x measured values
-
     """
+    # Test parameters
+    NUM_CLIENTS = 100
 
     async def measure_ttfe() -> tuple[float, str | None]:
         start = time.perf_counter()
@@ -274,7 +270,7 @@ async def test_first_event_latency(
         return -1, "no events received"
 
     start_time = time.perf_counter()
-    tasks = [asyncio.create_task(measure_ttfe()) for _ in range(scale)]
+    tasks = [asyncio.create_task(measure_ttfe()) for _ in range(NUM_CLIENTS)]
     results = await asyncio.gather(*tasks)
     elapsed = time.perf_counter() - start_time
 
@@ -293,8 +289,7 @@ async def test_first_event_latency(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_first_event_latency",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
@@ -313,8 +308,8 @@ async def test_first_event_latency(
         pytest.fail(f"Regression detected: {comparison.regression_reasons}")
 
     # Original assertions
-    if len(latencies) < scale * 0.9:
-        pytest.fail(f"Too many failed connections: {len(latencies)}/{scale}")
+    if len(latencies) < NUM_CLIENTS * 0.9:
+        pytest.fail(f"Too many failed connections: {len(latencies)}/{NUM_CLIENTS}")
 
     latencies.sort()
     p50 = latencies[len(latencies) // 2]
@@ -327,8 +322,6 @@ async def test_first_event_latency(
 @pytest.mark.loadtest
 async def test_event_latency_under_load(
     sse_server_url: str,
-    scale: int,
-    duration_minutes: int,
     metrics_collector: MetricsCollector,
     baseline_manager: BaselineManager,
     report_generator: ReportGenerator,
@@ -354,8 +347,8 @@ async def test_event_latency_under_load(
     tail latency issues that degrade user experience.
 
     ## Methodology
-    1. Launch `scale` concurrent clients to /sse?delay=0.01 (10ms between events)
-    2. Each client receives 100 events and records inter-event times
+    1. Launch NUM_CLIENTS concurrent clients to /sse?delay=0.01 (10ms between events)
+    2. Each client receives EVENTS_PER_CLIENT events and records inter-event times
     3. Aggregate all latency samples and compute percentiles
 
     ## Pass Criteria
@@ -363,6 +356,9 @@ async def test_event_latency_under_load(
     - Calibrated from measured p50=14.8ms, p95=21.4ms, p99=27.4ms at scale=100
     - Server delay: 10ms. Threshold factor: 1.3x measured values
     """
+    # Test parameters
+    NUM_CLIENTS = 100
+    EVENTS_PER_CLIENT = 100
 
     async def measure_latencies() -> tuple[list[float], str | None]:
         latencies: list[float] = []
@@ -379,14 +375,14 @@ async def test_event_latency_under_load(
                             latencies.append((now - last_time) * 1000)
                         last_time = now
                         count += 1
-                        if count >= 100:
+                        if count >= EVENTS_PER_CLIENT:
                             break
             return latencies, None
         except Exception as e:
             return latencies, str(e)
 
     start_time = time.perf_counter()
-    tasks = [asyncio.create_task(measure_latencies()) for _ in range(scale)]
+    tasks = [asyncio.create_task(measure_latencies()) for _ in range(NUM_CLIENTS)]
     results = await asyncio.gather(*tasks)
     elapsed = time.perf_counter() - start_time
 
@@ -406,8 +402,7 @@ async def test_event_latency_under_load(
     # Generate report
     report = metrics_collector.compute_report(
         test_name="test_event_latency_under_load",
-        scale=scale,
-        duration_minutes=duration_minutes,
+        scale=NUM_CLIENTS,
     )
     register_test_report(report)
 
