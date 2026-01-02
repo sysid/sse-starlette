@@ -15,3 +15,7 @@ venv
 Pipfile.lock
 .envrc
 .pdm-python
+
+# Load test results (generated, not tracked)
+tests/load/results/
+!tests/load/results/.gitkeep
