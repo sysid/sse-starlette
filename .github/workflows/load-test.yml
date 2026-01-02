@@ -21,6 +21,16 @@ on:
           - '1'
           - '5'
           - '10'
+      update_baseline:
+        description: 'Update baselines after run'
+        required: false
+        default: false
+        type: boolean
+      fail_on_regression:
+        description: 'Fail if regression detected'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   load-test:
@@ -51,6 +61,9 @@ jobs:
           python -m pytest tests/load/ -m "loadtest" \
             --scale=${{ inputs.scale }} \
             --duration=${{ inputs.duration }} \
+            --output-dir=tests/load/results \
+            ${{ inputs.update_baseline && '--update-baseline' || '' }} \
+            ${{ inputs.fail_on_regression && '--fail-on-regression' || '' }} \
             -v --tb=short \
             --junitxml=load-test-results.xml
 
@@ -58,10 +71,20 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: load-test-results
+          name: load-test-results-${{ github.sha }}
           path: |
             load-test-results.xml
+            tests/load/results/*.json
+            tests/load/results/*.html
           retention-days: 30
+
+      - name: Upload updated baselines
+        uses: actions/upload-artifact@v4
+        if: inputs.update_baseline
+        with:
+          name: updated-baselines-${{ github.sha }}
+          path: tests/load/baselines/*.json
+          retention-days: 90
 
       - name: Test Summary
         if: always()
@@ -70,7 +93,16 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Scale**: ${{ inputs.scale }} concurrent connections" >> $GITHUB_STEP_SUMMARY
           echo "- **Duration**: ${{ inputs.duration }} minutes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f load-test-results.xml ]; then
-            echo "Test results uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          echo "### Reports" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d tests/load/results ]; then
+            for f in tests/load/results/*.json; do
+              if [ -f "$f" ]; then
+                echo "- $(basename "$f")" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts for detailed HTML reports with charts." >> $GITHUB_STEP_SUMMARY

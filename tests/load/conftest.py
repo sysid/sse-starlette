@@ -4,13 +4,23 @@ Pytest fixtures for load testing.
 Provides container-based SSE server and utility fixtures.
 """
 
+from __future__ import annotations
+
 import os
 import time
-from typing import Generator
+from pathlib import Path
+from typing import TYPE_CHECKING, Generator
 
 import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
+
+from .baseline import BaselineManager
+from .metrics import MetricsCollector
+from .reporter import ReportGenerator
+
+if TYPE_CHECKING:
+    from .metrics import TestReport
 
 
 class SSELoadTestContainer(DockerContainer):
@@ -114,6 +124,37 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="1",
         help="Test duration in minutes",
     )
+    parser.addoption(
+        "--output-dir",
+        action="store",
+        default="tests/load/results",
+        help="Directory for test reports",
+    )
+    parser.addoption(
+        "--baselines-dir",
+        action="store",
+        default="tests/load/baselines",
+        help="Directory for baseline files",
+    )
+    parser.addoption(
+        "--update-baseline",
+        action="store_true",
+        default=False,
+        help="Save current run as new baseline",
+    )
+    parser.addoption(
+        "--fail-on-regression",
+        action="store_true",
+        default=False,
+        help="Exit non-zero if regression detected",
+    )
+    parser.addoption(
+        "--regression-threshold",
+        action="store",
+        type=int,
+        default=20,
+        help="Percent change to trigger regression warning",
+    )
 
 
 @pytest.fixture
@@ -126,3 +167,75 @@ def scale(request: pytest.FixtureRequest) -> int:
 def duration_minutes(request: pytest.FixtureRequest) -> int:
     """Get the duration in minutes for load tests."""
     return int(request.config.getoption("--duration"))
+
+
+@pytest.fixture
+def output_dir(request: pytest.FixtureRequest) -> Path:
+    """Get the output directory for reports."""
+    return Path(request.config.getoption("--output-dir"))
+
+
+@pytest.fixture
+def baselines_dir(request: pytest.FixtureRequest) -> Path:
+    """Get the baselines directory."""
+    return Path(request.config.getoption("--baselines-dir"))
+
+
+@pytest.fixture
+def update_baseline(request: pytest.FixtureRequest) -> bool:
+    """Whether to update baselines."""
+    return bool(request.config.getoption("--update-baseline"))
+
+
+@pytest.fixture
+def fail_on_regression(request: pytest.FixtureRequest) -> bool:
+    """Whether to fail on regression."""
+    return bool(request.config.getoption("--fail-on-regression"))
+
+
+@pytest.fixture
+def metrics_collector() -> MetricsCollector:
+    """Fresh metrics collector for each test."""
+    return MetricsCollector()
+
+
+@pytest.fixture(scope="session")
+def baseline_manager(request: pytest.FixtureRequest) -> BaselineManager:
+    """Baseline manager for comparison."""
+    baselines_dir = Path(request.config.getoption("--baselines-dir"))
+    threshold = int(request.config.getoption("--regression-threshold"))
+    thresholds = {
+        "latency_p99_warning_pct": float(threshold),
+        "latency_p99_fail_pct": float(threshold * 2.5),
+        "throughput_warning_pct": float(-threshold),
+        "memory_growth_warning_pct": float(threshold * 2.5),
+        "memory_slope_fail": 0.1,
+        "error_rate_fail_pct": 5.0,
+    }
+    return BaselineManager(baselines_dir=baselines_dir, thresholds=thresholds)
+
+
+@pytest.fixture(scope="session")
+def report_generator(request: pytest.FixtureRequest) -> ReportGenerator:
+    """Report generator for output."""
+    output_dir = Path(request.config.getoption("--output-dir"))
+    return ReportGenerator(output_dir=output_dir)
+
+
+# Store test reports for session-level access
+_test_reports: dict[str, "TestReport"] = {}
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Clear reports at session start."""
+    _test_reports.clear()
+
+
+def register_test_report(report: "TestReport") -> None:
+    """Register a test report for later processing."""
+    _test_reports[report.test_name] = report
+
+
+def get_test_reports() -> dict[str, "TestReport"]:
+    """Get all registered test reports."""
+    return _test_reports.copy()
