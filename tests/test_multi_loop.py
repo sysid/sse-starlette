@@ -84,9 +84,9 @@ class TestMultiLoopSafety:
 
         assert not errors, f"Errors occurred: {errors}"
         assert len(states) == 3
-        assert (
-            len(set(id(s) for s in states)) == 3
-        ), "States should be unique per thread"
+        assert len(set(id(s) for s in states)) == 3, (
+            "States should be unique per thread"
+        )
 
 
 class TestIssue149HandleExitSignaling:
@@ -162,9 +162,39 @@ class TestIssue149HandleExitSignaling:
             except asyncio.CancelledError:
                 pass
 
-        assert (
-            len(exited) == num_tasks
-        ), f"Only {len(exited)}/{num_tasks} tasks woke up."
+        assert len(exited) == num_tasks, (
+            f"Only {len(exited)}/{num_tasks} tasks woke up."
+        )
+
+    @pytest.mark.asyncio
+    async def test_manual_shutdown_ignores_signal(self):
+        """Test that manually setting should_exit wakes waiting tasks."""
+        task_exited = asyncio.Event()
+
+        async def wait_for_exit():
+            await EventSourceResponse._listen_for_exit_signal()
+            task_exited.set()
+
+        task = asyncio.create_task(wait_for_exit())
+        await asyncio.sleep(0.1)  # Let task start
+        original_drain = AppStatus.enable_automatic_graceful_drain
+        original_handler = AppStatus.original_handler
+        try:
+            AppStatus.disable_automatic_graceful_drain()
+            AppStatus.original_handler = None
+            AppStatus.handle_exit()
+            await asyncio.sleep(1.0)
+            assert not task_exited.is_set(), (
+                "Task woke up despite automatic signaling being disabled."
+            )
+            AppStatus.should_exit = True  # Manually signal shutdown
+            await asyncio.wait([task], timeout=1.0)
+            assert task_exited.is_set(), (
+                "Task did not wake up after manual shutdown signal."
+            )
+        finally:
+            AppStatus.enable_automatic_graceful_drain = original_drain
+            AppStatus.original_handler = original_handler
 
     @pytest.mark.asyncio
     async def test_all_tasks_share_same_shutdown_state(self):
