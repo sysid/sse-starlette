@@ -197,9 +197,9 @@ async def test_sse_multiple_consumers(
 
                 # Verify expectations
                 for i, client in enumerate(clients):
-                    assert (
-                        client.received_lines == expected_lines
-                    ), f"Client {i} received {client.received_lines} lines, expected {expected_lines}"
+                    assert client.received_lines == expected_lines, (
+                        f"Client {i} received {client.received_lines} lines, expected {expected_lines}"
+                    )
 
                 assert not errors, f"Consumers encountered errors: {errors}"
 

@@ -84,9 +84,9 @@ class TestMultiLoopSafety:
 
         assert not errors, f"Errors occurred: {errors}"
         assert len(states) == 3
-        assert (
-            len(set(id(s) for s in states)) == 3
-        ), "States should be unique per thread"
+        assert len(set(id(s) for s in states)) == 3, (
+            "States should be unique per thread"
+        )
 
 
 class TestIssue149HandleExitSignaling:
@@ -162,9 +162,9 @@ class TestIssue149HandleExitSignaling:
             except asyncio.CancelledError:
                 pass
 
-        assert (
-            len(exited) == num_tasks
-        ), f"Only {len(exited)}/{num_tasks} tasks woke up."
+        assert len(exited) == num_tasks, (
+            f"Only {len(exited)}/{num_tasks} tasks woke up."
+        )
 
     @pytest.mark.asyncio
     async def test_manual_shutdown_ignores_signal(self):
@@ -184,14 +184,14 @@ class TestIssue149HandleExitSignaling:
             AppStatus.original_handler = None
             AppStatus.handle_exit()
             await asyncio.sleep(1.0)
-            assert (
-                not task_exited.is_set()
-            ), "Task woke up despite automatic signaling being disabled."
+            assert not task_exited.is_set(), (
+                "Task woke up despite automatic signaling being disabled."
+            )
             AppStatus.should_exit = True  # Manually signal shutdown
             await asyncio.wait([task], timeout=1.0)
-            assert (
-                task_exited.is_set()
-            ), "Task did not wake up after manual shutdown signal."
+            assert task_exited.is_set(), (
+                "Task did not wake up after manual shutdown signal."
+            )
         finally:
             AppStatus.enable_automatic_graceful_drain = original_drain
             AppStatus.original_handler = original_handler
@@ -258,7 +258,9 @@ class TestUvicornIntrospection:
             # If the uvicorn check weren't bypassed, task would wake up
             await asyncio.sleep(1.0)
 
-            assert not task_exited.is_set(), "Task woke up from uvicorn.should_exit despite auto-drain being disabled."
+            assert not task_exited.is_set(), (
+                "Task woke up from uvicorn.should_exit despite auto-drain being disabled."
+            )
 
             # Now manually signal shutdown
             AppStatus.should_exit = True

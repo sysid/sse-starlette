@@ -107,18 +107,18 @@ QUALITY:  ## ############################################################
 
 .PHONY: format
 format:  ## perform ruff formatting
-	@ruff format $(pkg_src) $(tests_src)
+	@pre-commit run ruff-format --all-files
 
-.PHONY: format-check
-format-check:  ## perform black formatting
-	@ruff format --check $(pkg_src) $(tests_src)
+# .PHONY: format-check
+# format-check:  ## check ruff formatting
+# 	@ruff format --check $(pkg_src) $(tests_src)
 
 .PHONY: style
 style: format  ## perform code style format
 
 .PHONY: lint
 lint:  ## check style with ruff
-	ruff check $(pkg_src) $(tests_src)
+	ruff check --fix $(pkg_src) $(tests_src)
 
 .PHONY: mypy
 mypy:  ## check type hint annotations

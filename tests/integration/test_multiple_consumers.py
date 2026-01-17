@@ -85,9 +85,9 @@ async def test_sse_server_termination(caplog, app_path, expected_lines):
 
         # Check error count: one connection error per client
         error_count = sum(1 for _, error in results if error is not None)
-        assert (
-            error_count == N_CONSUMERS
-        ), f"Expected {N_CONSUMERS} errors, got {error_count}"
+        assert error_count == N_CONSUMERS, (
+            f"Expected {N_CONSUMERS} errors, got {error_count}"
+        )
 
         # Verify error messages
         for _, error in results:
@@ -102,9 +102,9 @@ async def test_sse_server_termination(caplog, app_path, expected_lines):
         _log.info(f"Message counts received: {message_counts}")
 
         # Since we're killing the server early, we expect incomplete message counts
-        assert all(
-            count < expected_lines for count in message_counts
-        ), f"Expected all counts to be less than {expected_lines}, got {message_counts}"
+        assert all(count < expected_lines for count in message_counts), (
+            f"Expected all counts to be less than {expected_lines}, got {message_counts}"
+        )
 
     finally:
         # Cleanup container if it's still around

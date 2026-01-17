@@ -124,9 +124,9 @@ class TestIssue152WatcherLeak:
 
             await asyncio.sleep(0.1)
 
-            assert (
-                len(watcher_starts) == 1
-            ), f"Rapid calls spawned {len(watcher_starts)} watchers, expected 1"
+            assert len(watcher_starts) == 1, (
+                f"Rapid calls spawned {len(watcher_starts)} watchers, expected 1"
+            )
         finally:
             sse_module._shutdown_watcher = original_watcher
 
