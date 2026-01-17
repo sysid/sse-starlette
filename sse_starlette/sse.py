@@ -93,11 +93,15 @@ async def _shutdown_watcher() -> None:
 
     try:
         while True:
-            # Check our flag (monkey-patch worked)
+            # Check our flag (monkey-patch worked or manually set)
             if AppStatus.should_exit:
                 break
             # Check uvicorn's flag directly (monkey-patch failed - Issue #132)
-            if uvicorn_server is not None and uvicorn_server.should_exit:
+            if (
+                AppStatus.enable_automatic_graceful_drain
+                and uvicorn_server is not None
+                and uvicorn_server.should_exit
+            ):
                 AppStatus.should_exit = True  # Sync state for consistency
                 break
             await anyio.sleep(0.5)
@@ -131,11 +135,22 @@ class AppStatus:
     """Helper to capture a shutdown signal from Uvicorn so we can gracefully terminate SSE streams."""
 
     should_exit = False
+    enable_automatic_graceful_drain = True
     original_handler: Optional[Callable] = None
 
     @staticmethod
+    def disable_automatic_graceful_drain():
+        """
+        Prevent automatically triggering streams to close on server shutdown. If you call this, you
+        should probably set AppStatus.should_exit at some point during server shutdown manually in
+        your shutdown handler. That will trigger the shutdown logic in about half a second
+        """
+        AppStatus.enable_automatic_graceful_drain = False
+
+    @staticmethod
     def handle_exit(*args, **kwargs):
-        AppStatus.should_exit = True
+        if AppStatus.enable_automatic_graceful_drain:
+            AppStatus.should_exit = True
         if AppStatus.original_handler is not None:
             AppStatus.original_handler(*args, **kwargs)
 
