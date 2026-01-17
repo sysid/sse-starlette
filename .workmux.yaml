@@ -1,0 +1,139 @@
+# workmux project configuration
+# For global settings, edit ~/.config/workmux/config.yaml
+# All options below are commented out - uncomment to override defaults.
+
+#-------------------------------------------------------------------------------
+# Git
+#-------------------------------------------------------------------------------
+
+# The primary branch to merge into.
+# Default: Auto-detected from remote HEAD, falls back to main/master.
+# main_branch: main
+
+# Default merge strategy for `workmux merge`.
+# Options: merge (default), rebase, squash
+# CLI flags (--rebase, --squash) always override this.
+# merge_strategy: rebase
+
+#-------------------------------------------------------------------------------
+# Naming & Paths
+#-------------------------------------------------------------------------------
+
+# Directory where worktrees are created.
+# Can be relative to repo root or absolute.
+# Default: Sibling directory '<project>__worktrees'.
+# worktree_dir: .worktrees
+
+# Strategy for deriving names from branch names.
+# Options: full (default), basename (part after last '/').
+# worktree_naming: basename
+
+# Prefix added to worktree directories and tmux window names.
+# worktree_prefix: ""
+
+# Prefix for tmux window names.
+# Default: "wm-"
+# window_prefix: "wm-"
+
+#-------------------------------------------------------------------------------
+# Tmux
+#-------------------------------------------------------------------------------
+
+# Custom tmux pane layout.
+# Default: Two-pane layout with shell and clear command.
+# panes:
+#   - command: pnpm install
+#     focus: true
+#   - split: horizontal
+#   - command: clear
+#     split: vertical
+#     size: 5
+
+# Auto-apply agent status icons to tmux window format.
+# Default: true
+# status_format: true
+
+# Custom icons for agent status display.
+status_icons:
+  working: "🤖"
+  waiting: "💬"
+  done: "✅"
+
+#-------------------------------------------------------------------------------
+# Agent & AI
+#-------------------------------------------------------------------------------
+
+# Agent command for '<agent>' placeholder in pane commands.
+# Default: "claude"
+# agent: claude
+
+# LLM-based branch name generation (`workmux add -a`).
+# auto_name:
+#   model: "gpt-4o-mini"
+#   system_prompt: "Generate a kebab-case git branch name."
+
+#-------------------------------------------------------------------------------
+# Hooks
+#-------------------------------------------------------------------------------
+
+# Commands to run in new worktree before tmux window opens.
+# These block window creation - use for short tasks only.
+# Use "<global>" to inherit from global config.
+# Set to empty list to disable: `post_create: []`
+# post_create:
+#   - "<global>"
+#   - mise use
+
+  # ẞOTCHA: copies .envrc target, not link
+post_create:
+  - ln -s $SOPS_PATH/dot.envrc .envrc
+  - direnv allow
+
+# Commands to run before merging (e.g., linting, tests).
+# Aborts the merge if any command fails.
+# Use "<global>" to inherit from global config.
+# Environment variables available:
+#   - WM_BRANCH_NAME: The name of the branch being merged
+#   - WM_TARGET_BRANCH: The name of the target branch (e.g., main)
+#   - WM_WORKTREE_PATH: Absolute path to the worktree
+#   - WM_PROJECT_ROOT: Absolute path of the main project directory
+#   - WM_HANDLE: The worktree handle/window name
+# pre_merge:
+#   - "<global>"
+#   - cargo test
+#   - cargo clippy -- -D warnings
+
+# Commands to run before worktree removal (during merge or remove).
+# Useful for backing up gitignored files before cleanup.
+# Default: Auto-detects Node.js projects and fast-deletes node_modules.
+# Set to empty list to disable: `pre_remove: []`
+# Environment variables available:
+#   - WM_HANDLE: The worktree handle (directory name)
+#   - WM_WORKTREE_PATH: Absolute path of the worktree being deleted
+#   - WM_PROJECT_ROOT: Absolute path of the main project directory
+# pre_remove:
+#   - mkdir -p "$WM_PROJECT_ROOT/artifacts/$WM_HANDLE"
+#   - cp -r test-results/ "$WM_PROJECT_ROOT/artifacts/$WM_HANDLE/"
+
+#-------------------------------------------------------------------------------
+# Files
+#-------------------------------------------------------------------------------
+
+# File operations when creating a worktree.
+# files:
+#   # Files to copy (useful for .env files that need to be unique).
+#   copy:
+#     - .env.local
+#
+#   # Files/directories to symlink (saves disk space, shares caches).
+#   # Default: None.
+#   # Use "<global>" to inherit from global config.
+#   symlink:
+#     - "<global>"
+#     - node_modules
+files:
+  symlink:
+    - .venv
+    - .claude
+    - CLAUDE.md
+    - thoughts
