@@ -14,10 +14,14 @@ class SSEServerContainer(DockerContainer):
         super().__init__("sse_starlette:latest")
         self.app_path = app_path
 
+        # Specify platform for amd64 image on arm64 hosts
+        self.with_kwargs(platform="linux/amd64")
+
         # Mount the current directory into the container
-        self.with_volume_mapping(
-            host="/Users/Q187392/dev/s/public/sse-starlette", container="/app"
-        )
+        import os
+
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        self.with_volume_mapping(host=project_root, container="/app")
         self.with_name("sse_starlette_test")
         self.with_command(
             f"uvicorn {self.app_path} --host 0.0.0.0 --port 8000 --log-level info"

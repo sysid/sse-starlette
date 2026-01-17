@@ -141,11 +141,25 @@ class AppStatus:
     @staticmethod
     def disable_automatic_graceful_drain():
         """
-        Prevent automatically triggering streams to close on server shutdown. If you call this, you
-        should probably set AppStatus.should_exit at some point during server shutdown manually in
-        your shutdown handler. That will trigger the shutdown logic in about half a second
+        Prevent automatic SSE stream termination on server shutdown.
+
+        WARNING: When disabled, you MUST set AppStatus.should_exit = True
+        at some point during shutdown, or streams will never close and the
+        server will hang indefinitely (or until uvicorn's graceful shutdown
+        timeout expires).
         """
         AppStatus.enable_automatic_graceful_drain = False
+
+    @staticmethod
+    def enable_automatic_graceful_drain_mode():
+        """
+        Re-enable automatic SSE stream termination on server shutdown.
+
+        This restores the default behavior where SIGTERM triggers immediate
+        stream draining. Call this to undo a previous call to
+        disable_automatic_graceful_drain().
+        """
+        AppStatus.enable_automatic_graceful_drain = True
 
     @staticmethod
     def handle_exit(*args, **kwargs):
