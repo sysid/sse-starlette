@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -e .
 
 # Install additional test dependencies if needed
 # You can also add these to pyproject.toml in [project.optional-dependencies]
-RUN pip install --no-cache-dir pytest pytest-asyncio httpx
+RUN pip install --no-cache-dir pytest pytest-asyncio httpx uvicorn
 
 # Copy test files
 COPY tests ./tests

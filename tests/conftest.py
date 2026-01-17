@@ -35,6 +35,7 @@ def reset_shutdown_state():
 
     # Setup: clean state
     AppStatus.should_exit = False
+    AppStatus.enable_automatic_graceful_drain = True
     if hasattr(_thread_state, "shutdown_state"):
         del _thread_state.shutdown_state
 
@@ -42,6 +43,7 @@ def reset_shutdown_state():
 
     # Teardown: signal shutdown to kill any running watchers, then clean up
     AppStatus.should_exit = True
+    AppStatus.enable_automatic_graceful_drain = True
     if hasattr(_thread_state, "shutdown_state"):
         del _thread_state.shutdown_state
 
