@@ -1289,6 +1289,15 @@ wheels = [
 ]
 
 [[package]]
+name = "httpx-sse"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/4c/751061ffa58615a32c31b2d82e8482be8dd4a89154f003147acee90f2be9/httpx_sse-0.4.3.tar.gz", hash = "sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d", size = 15943, upload_time = "2025-10-10T21:48:22.271Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/fd/6668e5aec43ab844de6fc74927e155a3b37bf40d7c3790e49fc0406b6578/httpx_sse-0.4.3-py3-none-any.whl", hash = "sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc", size = 8960, upload_time = "2025-10-10T21:48:21.158Z" },
+]
+
+[[package]]
 name = "hyperlink"
 version = "21.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2341,6 +2350,10 @@ granian = [
     { name = "granian", version = "2.5.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "granian", version = "2.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
+loadtest = [
+    { name = "httpx-sse" },
+    { name = "psutil" },
+]
 uvicorn = [
     { name = "uvicorn" },
 ]
@@ -2351,6 +2364,7 @@ dev = [
     { name = "async-timeout" },
     { name = "build" },
     { name = "httpx" },
+    { name = "httpx-sse" },
     { name = "mypy" },
     { name = "portend" },
     { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -2377,12 +2391,14 @@ requires-dist = [
     { name = "daphne", marker = "extra == 'daphne'", specifier = ">=4.2.0" },
     { name = "fastapi", marker = "extra == 'examples'", specifier = ">=0.115.12" },
     { name = "granian", marker = "extra == 'granian'", specifier = ">=2.3.1" },
+    { name = "httpx-sse", marker = "extra == 'loadtest'", specifier = ">=0.4.0" },
+    { name = "psutil", marker = "extra == 'loadtest'", specifier = ">=6.1.1" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'examples'", specifier = ">=2.0.41" },
     { name = "starlette", specifier = ">=0.49.1" },
     { name = "uvicorn", marker = "extra == 'examples'", specifier = ">=0.34.0" },
     { name = "uvicorn", marker = "extra == 'uvicorn'", specifier = ">=0.34.0" },
 ]
-provides-extras = ["examples", "uvicorn", "granian", "daphne"]
+provides-extras = ["examples", "uvicorn", "granian", "daphne", "loadtest"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2390,6 +2406,7 @@ dev = [
     { name = "async-timeout", specifier = ">=5.0.1" },
     { name = "build", specifier = ">=1.2.2.post1" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx-sse", specifier = ">=0.4.0" },
     { name = "mypy", specifier = ">=1.14.0" },
     { name = "portend", specifier = ">=3.2.0" },
     { name = "pre-commit", specifier = ">=4.0.0" },

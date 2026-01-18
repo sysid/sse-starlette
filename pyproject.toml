@@ -42,12 +42,17 @@ granian = [
 daphne = [
     "daphne>=4.2.0",
 ]
+loadtest = [
+    "httpx-sse>=0.4.0",
+    "psutil>=6.1.1",
+]
 
 [dependency-groups]  # new standard, included by default
 dev = [
     "asgi-lifespan>=2.1.0",
     "async-timeout>=5.0.1",
     "httpx>=0.28.1",
+    "httpx-sse>=0.4.0",
     "mypy>=1.14.0",
     "portend>=3.2.0",
     "psutil>=6.1.1",
@@ -102,7 +107,8 @@ filename = "sse_starlette/__init__.py"
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests",
-    "experimentation: marks tests as experimental tests, not to be run in CICD"
+    "experimentation: marks tests as experimental tests, not to be run in CICD",
+    "loadtest: marks tests as load tests (require docker and significant resources)"
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

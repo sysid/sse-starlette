@@ -1,0 +1,86 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: 'Update baselines after run'
+        required: false
+        default: false
+        type: boolean
+      fail_on_regression:
+        description: 'Fail if regression detected'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e ".[loadtest]"
+
+      - name: Build load test Docker image
+        run: |
+          docker build -f tests/Dockerfile.loadtest -t sse-starlette-loadtest:latest .
+
+      - name: Run load tests
+        run: |
+          python -m pytest tests/load/ -m "loadtest" \
+            --output-dir=tests/load/results \
+            ${{ inputs.update_baseline && '--update-baseline' || '' }} \
+            ${{ inputs.fail_on_regression && '--fail-on-regression' || '' }} \
+            -v --tb=short \
+            --junitxml=load-test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results-${{ github.sha }}
+          path: |
+            load-test-results.xml
+            tests/load/results/*.json
+            tests/load/results/*.html
+          retention-days: 30
+
+      - name: Upload updated baselines
+        uses: actions/upload-artifact@v4
+        if: inputs.update_baseline
+        with:
+          name: updated-baselines-${{ github.sha }}
+          path: tests/load/baselines/*.json
+          retention-days: 90
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Reports" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d tests/load/results ]; then
+            for f in tests/load/results/*.json; do
+              if [ -f "$f" ]; then
+                echo "- $(basename "$f")" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts for detailed HTML reports with charts." >> $GITHUB_STEP_SUMMARY
