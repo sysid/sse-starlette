@@ -279,22 +279,37 @@ class EventSourceResponse(Response):
             }
         )
 
-        async for data in self.body_iterator:
-            chunk = ensure_bytes(data, self.sep)
-            logger.debug("chunk: %s", chunk)
-            with anyio.move_on_after(self.send_timeout) as cancel_scope:
-                await send(
-                    {"type": "http.response.body", "body": chunk, "more_body": True}
-                )
+        try:
+            async for data in self.body_iterator:
+                chunk = ensure_bytes(data, self.sep)
+                logger.debug("chunk: %s", chunk)
+                with anyio.move_on_after(self.send_timeout) as cancel_scope:
+                    await send(
+                        {"type": "http.response.body", "body": chunk, "more_body": True}
+                    )
 
-            if cancel_scope and cancel_scope.cancel_called:
-                if hasattr(self.body_iterator, "aclose"):
-                    await self.body_iterator.aclose()
-                raise SendTimeoutError()
-
-        async with self._send_lock:
+                if cancel_scope and cancel_scope.cancel_called:
+                    if hasattr(self.body_iterator, "aclose"):
+                        await self.body_iterator.aclose()
+                    raise SendTimeoutError()
+        finally:
+            # Always send the closing frame to properly terminate the HTTP response.
+            # Without this, middleware (e.g. BaseHTTPMiddleware) can't detect response
+            # end, leaving the connection open (Issue #164). Shield prevents the send
+            # from being cancelled during task group cleanup.
             self.active = False
-            await send({"type": "http.response.body", "body": b"", "more_body": False})
+            with anyio.CancelScope(shield=True):
+                async with self._send_lock:
+                    try:
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": b"",
+                                "more_body": False,
+                            }
+                        )
+                    except Exception:
+                        pass
 
     async def _listen_for_disconnect(self, receive: Receive) -> None:
         """Watch for a disconnect message from the client."""
