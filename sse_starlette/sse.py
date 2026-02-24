@@ -186,8 +186,27 @@ ContentStream = Union[AsyncContentStream, SyncContentStream]
 
 
 class EventSourceResponse(Response):
-    """
-    Streaming response that sends data conforming to the SSE (Server-Sent Events) specification.
+    """Streaming response implementing the SSE (Server-Sent Events) specification.
+
+    Args:
+        content: Async iterable or sync iterator yielding SSE event data.
+        status_code: HTTP status code. Default: 200.
+        headers: Additional HTTP headers.
+        media_type: Response media type. Default: "text/event-stream".
+        background: Background task to run after response completes.
+        ping: Ping interval in seconds (0 to disable). Default: 15.
+        sep: Line separator for SSE messages ("\\r\\n", "\\r", or "\\n").
+        ping_message_factory: Callable returning custom ping ServerSentEvent.
+        data_sender_callable: Async callable for push-based data sending.
+        send_timeout: Timeout in seconds for individual send operations.
+        client_close_handler_callable: Async callback on client disconnect.
+        shutdown_event: Optional ``anyio.Event`` set by the library when server
+            shutdown is detected. Generators can watch this event to send farewell
+            messages and exit cooperatively instead of receiving CancelledError.
+        shutdown_grace_period: Seconds to wait after setting ``shutdown_event``
+            before force-cancelling the generator. Must be >= 0. Should be less
+            than your ASGI server's graceful shutdown timeout. Default: 0
+            (immediate cancel, identical to pre-v3.3.0 behavior).
     """
 
     DEFAULT_PING_INTERVAL = 15
@@ -210,6 +229,8 @@ class EventSourceResponse(Response):
         client_close_handler_callable: Optional[
             Callable[[Message], Awaitable[None]]
         ] = None,
+        shutdown_event: Optional[anyio.Event] = None,
+        shutdown_grace_period: float = 0,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -249,6 +270,16 @@ class EventSourceResponse(Response):
         self.ping_message_factory = ping_message_factory
 
         self.client_close_handler_callable = client_close_handler_callable
+
+        # Cooperative shutdown (Issue #167): Allow generators to send farewell
+        # events before force-cancellation. The grace period should be less than
+        # your ASGI server's graceful shutdown timeout (e.g. uvicorn's
+        # --timeout-graceful-shutdown), otherwise the process is killed before
+        # the grace period expires.
+        if shutdown_grace_period < 0:
+            raise ValueError("shutdown_grace_period must be >= 0")
+        self._shutdown_event = shutdown_event
+        self._shutdown_grace_period = shutdown_grace_period
 
         self.active = True
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
@@ -327,6 +358,26 @@ class EventSourceResponse(Response):
         finally:
             state.events.discard(event)
 
+    async def _listen_for_exit_signal_with_grace(self) -> None:
+        """Wait for shutdown signal, then optionally give generator a grace period.
+
+        Issue #167: When a shutdown_event is provided, the library sets it before
+        returning, giving the generator a chance to send farewell events and exit
+        cooperatively. The shutdown_grace_period controls how long to wait before
+        force-cancelling via task group cancellation.
+        """
+        await self._listen_for_exit_signal()
+
+        # Signal the user's generator that shutdown is happening
+        if self._shutdown_event:
+            self._shutdown_event.set()
+
+        # Grace period: let generator finish naturally before force-cancel
+        if self._shutdown_grace_period > 0:
+            with anyio.move_on_after(self._shutdown_grace_period):
+                while self.active:
+                    await anyio.sleep(0.1)
+
     async def _ping(self, send: Send) -> None:
         """Periodically send ping messages to keep the connection alive on proxies.
         - frequenccy ca every 15 seconds.
@@ -369,7 +420,9 @@ class EventSourceResponse(Response):
 
             task_group.start_soon(cancel_on_finish, lambda: self._stream_response(send))
             task_group.start_soon(cancel_on_finish, lambda: self._ping(send))
-            task_group.start_soon(cancel_on_finish, self._listen_for_exit_signal)
+            task_group.start_soon(
+                cancel_on_finish, self._listen_for_exit_signal_with_grace
+            )
 
             if self.data_sender_callable:
                 task_group.start_soon(self.data_sender_callable)
