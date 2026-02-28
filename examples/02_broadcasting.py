@@ -1,11 +1,22 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "sse-starlette",
+#   "fastapi",
+#   "uvicorn",
+# ]
+# ///
 """
-- Queue-based message broadcasting to multiple SSE clients
-- Clean Stream abstraction that implements async iterator protocol
-- Proper client connection/disconnection handling
+Queue-based message broadcasting to multiple SSE clients.
+
+This example demonstrates:
+- Broadcasting messages to all connected clients via per-client queues
+- Async iterator protocol (``__aiter__``/``__anext__``) for custom streams
+- Proper client connection/disconnection tracking
 - REST API for sending messages to all connected clients
 
 Usage:
-    python 02_message_broadcasting.py
+    python examples/02_broadcasting.py
 
 Test with curl:
     # Terminal 1: Subscribe to events (keep running)

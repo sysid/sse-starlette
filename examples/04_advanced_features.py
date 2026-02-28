@@ -1,16 +1,23 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "sse-starlette",
+#   "fastapi",
+#   "uvicorn",
+# ]
+# ///
 """
-Advanced SSE features example showing custom ping, error handling, and timeouts.
+Advanced SSE features: custom ping, error handling, separators, and headers.
 
 This example demonstrates:
 - Custom ping messages and intervals
 - Error handling within streams
-- Send timeouts for hanging connections
 - Different line separators
 - Background tasks
 - Cache control headers for proxies
 
 Usage:
-    python 04_advanced_features.py
+    python examples/04_advanced_features.py
 
 Test with curl:
     # Stream with custom ping (every 3 seconds)

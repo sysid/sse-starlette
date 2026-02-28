@@ -1,23 +1,35 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "sse-starlette",
+#   "fastapi",
+#   "uvicorn",
+# ]
+# ///
 """
 Basic Server-Sent Events (SSE) example with both Starlette and FastAPI.
 
 This example demonstrates:
-- Simple number streaming
+- Finite streaming (numbers 1-10)
+- Endless streaming with client disconnect handling
+- Conditional data availability (yield only when data exists)
 - Both Starlette and FastAPI implementations
-- Proper client disconnection handling
 
 Usage:
-    python 01_basic_sse.py
+    python examples/01_basic_sse.py
 
 Test with curl:
-    # Basic streaming (will receive numbers 1-10 with 1 second intervals)
+    # Finite stream (numbers 1-10, then closes)
     curl -N http://localhost:8000/starlette/numbers
 
-    # Endless streaming (press Ctrl+C to stop)
+    # Endless stream (press Ctrl+C to stop)
     curl -N http://localhost:8000/fastapi/endless
 
     # Custom range
     curl -N http://localhost:8000/fastapi/range/5/15
+
+    # Conditional stream (yields one item, then keeps connection open)
+    curl -N http://localhost:8000/fastapi/conditional
 """
 
 import asyncio
@@ -83,6 +95,32 @@ async def fastapi_range_endpoint(
     return EventSourceResponse(generate_numbers(start, end))
 
 
+async def generate_conditional_stream(
+    request: Request,
+) -> AsyncGenerator[dict, None]:
+    """Yield events only when data is available, sleeping between checks.
+
+    This pattern is common in real-world applications where new data
+    arrives intermittently (e.g. new chat messages, sensor readings).
+    The generator keeps the connection open but only sends events when
+    there is something to report.
+    """
+    has_data = True
+    while True:
+        if await request.is_disconnected():
+            break
+        if has_data:
+            yield dict(data="new data available")
+            has_data = False  # Simulate: data consumed, wait for more
+        await asyncio.sleep(0.9)
+
+
+@fastapi_app.get("/conditional")
+async def fastapi_conditional_endpoint(request: Request) -> EventSourceResponse:
+    """FastAPI endpoint demonstrating conditional data availability."""
+    return EventSourceResponse(generate_conditional_stream(request))
+
+
 # Main Starlette application
 starlette_routes = [
     Route("/starlette/numbers", endpoint=starlette_numbers_endpoint),
@@ -94,8 +132,11 @@ app = Starlette(debug=True, routes=starlette_routes)
 if __name__ == "__main__":
     print("Starting SSE server...")
     print("Available endpoints:")
-    print("  - http://localhost:8000/starlette/numbers (numbers 1-10)")
+    print("  - http://localhost:8000/starlette/numbers (finite stream, numbers 1-10)")
     print("  - http://localhost:8000/fastapi/endless (endless stream)")
     print("  - http://localhost:8000/fastapi/range/5/15 (custom range)")
+    print(
+        "  - http://localhost:8000/fastapi/conditional (yield only when data available)"
+    )
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
