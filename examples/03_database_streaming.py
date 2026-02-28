@@ -1,5 +1,15 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "sse-starlette",
+#   "fastapi",
+#   "uvicorn",
+#   "sqlalchemy[asyncio]",
+#   "aiosqlite",
+# ]
+# ///
 """
-Database Streaming Example - Thread-safe SQLAlchemy session management in SSE
+Thread-safe database session management in SSE generators.
 
 This example demonstrates:
 - CORRECT: Create database sessions within generators (thread-safe)
@@ -11,7 +21,7 @@ CRITICAL SESSION RULE: Never reuse database sessions between async tasks.
 Always create new sessions within generators that will run in task groups.
 
 Usage:
-    python 03_database_streaming.py
+    python examples/03_database_streaming.py
 
 Test with curl:
     # Stream all tasks
