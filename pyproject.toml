@@ -1,6 +1,6 @@
 [project]
 name = "sse-starlette"
-version = "3.2.0"
+version = "3.3.0"
 description = "SSE plugin for Starlette"
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -49,7 +49,7 @@ dev = [
     "async-timeout>=5.0.1",
     "httpx>=0.28.1",
     "mypy>=1.14.0",
-    "portend>=3.2.0",
+    "portend>=3.3.0",
     "psutil>=6.1.1",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.0",
@@ -74,7 +74,7 @@ build-backend = "setuptools.build_meta"
 include = ["sse_starlette*"]
 
 [tool.bumpversion]
-current_version = "3.2.0"
+current_version = "3.3.0"
 commit = true
 tag = false
 message = "Bump version to {new_version}"
