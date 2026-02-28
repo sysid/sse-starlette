@@ -37,7 +37,7 @@ class SSEServerContainer(DockerContainer):
 async def consume_events(url: str, expected_lines: int = 2):
     """Simulate Client: Stream the SSE endpoint and count received lines."""
     i = 0
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             async with client.stream("GET", url) as response:
                 async for line in response.aiter_lines():
