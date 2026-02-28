@@ -10,9 +10,9 @@ repos:
 
   - repo: local
     hooks:
-      - id: mypy
-        name: mypy
-        entry: mypy --config-file pyproject.toml sse_starlette
+      - id: ty
+        name: ty
+        entry: ty check sse_starlette
         language: system
         types: [python]
         files: ^sse_starlette/

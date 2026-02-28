@@ -9,10 +9,8 @@ tags
 *.pyc
 .coverage
 .pytest_cache/
-.mypy_cache/
+.ty/
 *.egg-info/
 __pycache__/
 venv
-Pipfile.lock
 .envrc
-.pdm-python

@@ -4,7 +4,7 @@ version = "3.2.0"
 description = "SSE plugin for Starlette"
 readme = "README.md"
 license = "BSD-3-Clause"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "sysid", email = "sysid@gmx.de" },
 ]
@@ -14,7 +14,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -43,24 +42,24 @@ daphne = [
     "daphne>=4.2.0",
 ]
 
-[dependency-groups]  # new standard, included by default
+[dependency-groups]
 dev = [
     "asgi-lifespan>=2.1.0",
     "async-timeout>=5.0.1",
+    "build>=1.4.0",
     "httpx>=0.28.1",
-    "mypy>=1.14.0",
     "portend>=3.2.0",
-    "psutil>=6.1.1",
+    "pre-commit>=4.5.0",
+    "psutil>=7.0.0",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
-    "ruff>=0.8.4",
+    "ruff>=0.14.0",
     "starlette>=0.49.1",
     "tenacity>=9.0.0",
     "testcontainers>=4.9.0",
+    "ty>=0.0.19",
     "uvicorn>=0.34.0",
-    "build>=1.2.2.post1",
-    "pre-commit>=4.0.0",
 ]
 
 [project.urls]
@@ -110,11 +109,9 @@ filterwarnings = [
     # testcontainers internal deprecation warning (triggered at import time by their own code)
     "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning",
 ]
-#addopts = "--cov=my_package --cov-report=term-missing"
 
-[tool.mypy]
-ignore_missing_imports = false
-namespace_packages = true
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.coverage.run]
 source = ["sse_starlette"]
@@ -132,46 +129,14 @@ skip_covered = true
 fail_under = 85
 
 [tool.ruff]
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-]
 line-length = 88
 indent-width = 4
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
-ignore = []
 fixable = ["ALL"]
-unfixable = []
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"

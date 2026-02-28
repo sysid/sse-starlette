@@ -319,8 +319,9 @@ class EventSourceResponse(Response):
                 )
 
             if cancel_scope and cancel_scope.cancel_called:
-                if hasattr(self.body_iterator, "aclose"):
-                    await self.body_iterator.aclose()
+                aclose = getattr(self.body_iterator, "aclose", None)
+                if aclose is not None:
+                    await aclose()
                 raise SendTimeoutError()
 
         async with self._send_lock:

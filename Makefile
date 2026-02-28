@@ -1,9 +1,5 @@
 .DEFAULT_GOAL := help
 
-# You can set these variables from the command line, and also from the environment for the first two.
-SOURCEDIR     = source
-BUILDDIR      = build
-MAKE          = make
 VERSION       = $(shell cat VERSION)
 PACKAGE_NAME  = sse-starlette
 
@@ -24,7 +20,6 @@ DEVELOP: ## ############################################################
 build-docker: ## build docker image
 	@echo "building docker image"
 	docker build --platform linux/amd64 --progress=plain -t sse_starlette .
-	#docker tag $(IMAGE_NAME) 339712820866.dkr.ecr.eu-central-1.amazonaws.com/sse-starlette/sse-starlette:latest
 
 ################################################################################
 # Building, Deploying \
@@ -32,12 +27,12 @@ BUILDING:  ## ############################################################
 .PHONY: build
 build: clean format  ## format and build
 	@echo "building"
-	python -m build
+	uv run python -m build
 
 .PHONY: publish
 publish:  ## publish
 	@echo "upload to Pypi"
-	twine upload --verbose dist/*
+	uv run twine upload --verbose dist/*
 
 .PHONY: bump-major
 bump-major:  check-github-token  ## bump-major, tag and push
@@ -83,19 +78,16 @@ check-github-token:  ## Check if GITHUB_TOKEN is set
 TESTING:  ## ############################################################
 .PHONY: test
 test: test-unit test-docker  ## run tests
-	#python -m pytest -ra --junitxml=report.xml --cov-config=pyproject.toml --cov-report=xml --cov-report term --cov=$(pkg_src) tests/
-	#RUN_ENV=local python -m pytest -m "not (experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
-	:
 
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
-	RUN_ENV=local python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	RUN_ENV=local uv run python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
 
 .PHONY: test-docker
 test-docker:  ## test-docker (docker desktop: advanced settings)
 	@if [ -S /var/run/docker.sock > /dev/null 2>&1 ]; then \
-		echo "Running docker tests because /var/run/docker.docker exists..."; \
-		RUN_ENV=local python -m pytest -m "integration" tests; \
+		echo "Running docker tests because /var/run/docker.sock exists..."; \
+		RUN_ENV=local uv run python -m pytest -m "integration" tests; \
 	else \
 		echo "Skipping tests: /var/run/docker.sock does not exist."; \
 	fi
@@ -107,26 +99,22 @@ QUALITY:  ## ############################################################
 
 .PHONY: format
 format:  ## perform ruff formatting
-	@pre-commit run ruff-format --all-files
-
-# .PHONY: format-check
-# format-check:  ## check ruff formatting
-# 	@ruff format --check $(pkg_src) $(tests_src)
+	uv run ruff format $(pkg_src) $(tests_src)
 
 .PHONY: style
 style: format  ## perform code style format
 
 .PHONY: lint
 lint:  ## check style with ruff
-	ruff check --fix $(pkg_src) $(tests_src)
+	uv run ruff check --fix $(pkg_src) $(tests_src)
 
-.PHONY: mypy
-mypy:  ## check type hint annotations
-	@mypy --config-file pyproject.toml --install-types --non-interactive $(pkg_src)
+.PHONY: ty
+ty:  ## check type hint annotations
+	uv run ty check $(pkg_src)
 
 .PHONY: pre-commit-install
 pre-commit-install:  ## install pre-commit hooks
-	pre-commit install
+	uv run pre-commit install
 
 ################################################################################
 # Clean \
@@ -166,4 +154,4 @@ export PRINT_HELP_PYSCRIPT
 
 .PHONY: help
 help:
-	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+	@uv run python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
