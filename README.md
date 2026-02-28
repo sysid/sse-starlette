@@ -46,7 +46,7 @@ app = Starlette(routes=[Route("/events", sse_endpoint)])
 - **Framework Integration**: Native Starlette and FastAPI support
 - **Async/Await**: Built on modern Python async patterns
 - **Connection Management**: Automatic client disconnect detection
-- **Graceful Shutdown**: Proper cleanup on server termination
+- **Graceful Shutdown**: Proper cleanup on server termination with cooperative shutdown support
 - **Thread Safety**: Context-local event management for multi-threaded applications
 - **Multi-Loop Support**: Works correctly with multiple asyncio event loops
 
@@ -199,6 +199,53 @@ async def channel_endpoint(request):
     )
 ```
 
+### Cooperative Shutdown
+
+By default, generators receive `CancelledError` immediately when the server shuts down. With
+cooperative shutdown, generators can detect the shutdown signal, send farewell events to clients,
+and exit gracefully within a configurable grace period.
+
+```python
+import anyio
+from sse_starlette import EventSourceResponse
+
+async def graceful_stream(request):
+    shutdown_event = anyio.Event()
+
+    async def generate():
+        try:
+            while not shutdown_event.is_set():
+                yield {"data": "tick"}
+                # Check for shutdown between iterations
+                with anyio.move_on_after(1.0):
+                    await shutdown_event.wait()
+            # Shutdown detected — send farewell event
+            yield {"event": "shutdown", "data": "Server is shutting down"}
+        except anyio.get_cancelled_exc_class():
+            # Grace period expired — generator force-cancelled
+            raise
+
+    return EventSourceResponse(
+        generate(),
+        shutdown_event=shutdown_event,       # Library sets this on shutdown
+        shutdown_grace_period=5.0,           # Seconds to wait before force-cancel
+    )
+```
+
+**How it works:**
+
+1. On server shutdown, the library sets your `shutdown_event`
+2. Your generator sees the event and can yield final events
+3. If the generator exits within `shutdown_grace_period`, shutdown is clean (no `CancelledError`)
+4. If the generator doesn't exit in time, it is force-cancelled as before
+
+**Important:** `shutdown_grace_period` should be less than your ASGI server's graceful shutdown
+timeout (e.g. uvicorn's `--timeout-graceful-shutdown`), otherwise the process is killed before the
+grace period expires.
+
+Without `shutdown_event` (the default), behavior is identical to previous versions: immediate
+cancellation on server shutdown.
+
 ## Configuration Options
 
 ### EventSourceResponse Parameters
@@ -206,11 +253,13 @@ async def channel_endpoint(request):
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `content` | `ContentStream` | Required | Async generator or iterable |
-| `ping` | `int` | 15 | Ping interval in seconds |
+| `ping` | `int` | 15 | Ping interval in seconds (0 to disable) |
 | `sep` | `str` | `"\r\n"` | Line separator (`\r\n`, `\r`, `\n`) |
-| `send_timeout` | `float` | `None` | Send operation timeout |
+| `send_timeout` | `float` | `None` | Send operation timeout in seconds |
 | `headers` | `dict` | `None` | Additional HTTP headers |
 | `ping_message_factory` | `Callable` | `None` | Custom ping message creator |
+| `shutdown_event` | `anyio.Event` | `None` | Event set by library on server shutdown |
+| `shutdown_grace_period` | `float` | `0` | Seconds to wait after setting `shutdown_event` before force-cancel |
 
 ### Client Disconnection
 
