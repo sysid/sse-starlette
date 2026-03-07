@@ -50,6 +50,9 @@ app = Starlette(routes=[Route("/events", sse_endpoint)])
 - **Thread Safety**: Context-local event management for multi-threaded applications
 - **Multi-Loop Support**: Works correctly with multiple asyncio event loops
 
+For a detailed look at the internal task coordination, shutdown detection, and cancellation
+flows, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Key Components
 
 ### EventSourceResponse
