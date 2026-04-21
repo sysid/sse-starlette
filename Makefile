@@ -81,7 +81,7 @@ test: test-unit test-docker  ## run tests
 
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
-	RUN_ENV=local uv run python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+	RUN_ENV=local uv run python -m pytest --ignore=tests/experimentation -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
 
 .PHONY: test-experimentation
 test-experimentation:  ## run experimentation tests (requires --group experimentation)
