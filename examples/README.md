@@ -5,8 +5,8 @@ Runnable examples demonstrating sse-starlette features.
 ## Prerequisites
 
 - `pip install sse-starlette` (or install from source)
-- Most examples need: `pip install fastapi uvicorn`
-- Example 03 additionally needs: `pip install sqlalchemy[asyncio] aiosqlite`
+- Most examples: `pip install 'sse-starlette[examples]'` (pulls fastapi, uvicorn, pydantic)
+- Example 03 additionally: `pip install 'sse-starlette[examples-db]'` (pulls sqlalchemy, aiosqlite)
 
 ## Examples
 

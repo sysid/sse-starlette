@@ -29,6 +29,9 @@ dependencies = [
 examples = [
     "uvicorn>=0.34.0",
     "fastapi>=0.115.12",
+    "pydantic>=2",
+]
+examples-db = [
     "sqlalchemy[asyncio]>=2.0.41",
     "aiosqlite>=0.21.0",
 ]
@@ -45,21 +48,20 @@ daphne = [
 [dependency-groups]
 dev = [
     "asgi-lifespan>=2.1.0",
-    "async-timeout>=5.0.1",
-    "build>=1.4.0",
     "httpx>=0.28.1",
-    "portend>=3.2.1",
     "pre-commit>=4.5.0",
-    "psutil>=7.0.0",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.14.0",
-    "starlette>=0.49.1",
-    "tenacity>=9.0.0",
     "testcontainers>=4.9.0",
     "ty>=0.0.19",
     "uvicorn>=0.34.0",
+]
+experimentation = [
+    "portend>=3.2.1",
+    "psutil>=7.0.0",
+    "tenacity>=9.0.0",
 ]
 
 [project.urls]

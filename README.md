@@ -14,8 +14,11 @@ Production ready Server-Sent Events implementation for Starlette and FastAPI fol
 pip install sse-starlette
 uv add sse-starlette
 
-# To run the examples and demonstrations
+# To run the examples (fastapi, uvicorn, pydantic)
 uv add sse-starlette[examples]
+
+# Example 03 also needs the DB extras (sqlalchemy, aiosqlite)
+uv add sse-starlette[examples,examples-db]
 
 # Recommended ASGI server
 uv add sse-starlette[uvicorn,granian,daphne]
@@ -429,9 +432,15 @@ timeout server 60s
 See examples and demonstrations for implementation patterns. Run tests with:
 
 ```bash
-make test-unit  # Unit tests only
-make test       # All tests including integration
+make test-unit              # Unit tests only (default dev install)
+make test                   # Unit + docker integration tests
+make test-experimentation   # Optional experimentation tests (multi-consumer load tests)
+                            # Requires the `experimentation` dependency group:
+                            #   uv sync --group experimentation
 ```
+
+The `experimentation` group is opt-in (kept out of the default `dev` install) to keep the
+contributor footprint small. See `tests/experimentation/` for the tests it enables.
 
 <!-- Badges -->
 [pypi-image]: https://badge.fury.io/py/sse-starlette.svg
