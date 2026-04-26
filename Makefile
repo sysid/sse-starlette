@@ -27,7 +27,7 @@ BUILDING:  ## ############################################################
 .PHONY: build
 build: clean format  ## format and build
 	@echo "building"
-	uv run python -m build
+	uv build
 
 .PHONY: publish
 publish:  ## publish
@@ -82,6 +82,10 @@ test: test-unit test-docker  ## run tests
 .PHONY: test-unit
 test-unit:  ## run all tests except "integration" marked
 	RUN_ENV=local uv run python -m pytest -m "not (integration or experimentation)" --cov-config=pyproject.toml --cov-report=html --cov-report=term --cov=$(pkg_src) tests
+
+.PHONY: test-experimentation
+test-experimentation:  ## run experimentation tests (requires --group experimentation)
+	RUN_ENV=local uv run --group experimentation python -m pytest -m "experimentation" tests/experimentation
 
 .PHONY: test-docker
 test-docker:  ## test-docker (docker desktop: advanced settings)

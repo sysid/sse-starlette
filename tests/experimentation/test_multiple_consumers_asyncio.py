@@ -5,7 +5,7 @@ from typing import AsyncIterator, List
 import pytest
 import httpx
 import uvicorn
-from async_timeout import timeout
+from asyncio import timeout
 import portend
 from tenacity import retry, stop_after_attempt, wait_exponential
 
