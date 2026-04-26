@@ -192,7 +192,11 @@ class TestEventSourceResponse:
         # Act & Assert
         with pytest.raises(SendTimeoutError):
             with collapse_excgroups():
-                await response({}, mock_receive, mock_send)
+                await response(
+                    {"type": "http", "method": "GET", "headers": []},
+                    mock_receive,
+                    mock_send,
+                )
 
         assert cleanup_executed, "Cleanup should be executed on timeout"
 
@@ -263,7 +267,9 @@ class TestEventSourceResponse:
         # Act & Assert
         with pytest.raises(anyio.WouldBlock):
             with collapse_excgroups():
-                await response({}, receive, send)
+                await response(
+                    {"type": "http", "method": "GET", "headers": []}, receive, send
+                )
 
     def test_pingInterval_whenCreated_thenUsesDefaultValue(self):
         # Arrange & Act
@@ -328,7 +334,9 @@ class TestEventSourceResponse:
         response = EventSourceResponse([], background=BackgroundTask(background_task))
 
         # Act
-        await response({}, mock_receive, mock_send)
+        await response(
+            {"type": "http", "method": "GET", "headers": []}, mock_receive, mock_send
+        )
 
         # Assert
         assert task_executed, "Background task should be executed"

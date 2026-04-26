@@ -1,3 +1,31 @@
+"""Server-Sent Events response for Starlette / FastAPI.
+
+Intentional divergence from ``starlette.responses.StreamingResponse``
+--------------------------------------------------------------------
+
+``EventSourceResponse`` is modelled on Starlette's ``StreamingResponse`` and
+re-syncs most of its behaviour (WebSocket denial, ``collapse_excgroups()``
+around the task group, ``memoryview`` chunk handling). The following points
+are deliberate divergences — DO NOT "fix" them without reading the rationale:
+
+1. ASGI ``spec_version >= 2.4`` fast path is NOT adopted.
+   Upstream short-circuits to ``await stream_response(send)`` and converts
+   ``OSError`` into ``ClientDisconnect``, skipping ``listen_for_disconnect``.
+   We keep ``_listen_for_disconnect`` running because it
+     (a) invokes ``client_close_handler_callable`` on disconnect,
+     (b) flips ``self.active = False`` so ``_ping`` and the cooperative
+         shutdown grace loop exit promptly.
+   Adopting the upstream fast path would regress both features.
+
+2. ``_wrap_websocket_denial_send`` is inlined in this module rather than
+   inherited from ``starlette.responses.Response``. The helper landed on
+   Starlette ``main`` after our minimum pin (``starlette>=0.41.3``); inline
+   until the floor moves past the release that contains it.
+
+3. ``collapse_excgroups()`` is vendored in ``sse_starlette._utils`` rather
+   than imported from ``starlette._utils`` (private module).
+"""
+
 import asyncio
 import logging
 import signal
@@ -24,6 +52,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send, Message
 
+from sse_starlette._utils import collapse_excgroups
 from sse_starlette.event import ServerSentEvent, ensure_bytes
 
 
@@ -125,6 +154,24 @@ def _ensure_watcher_started_on_this_loop() -> None:
         except RuntimeError:
             # No running loop - shouldn't happen in normal use
             state.watcher_started = False
+
+
+def _wrap_websocket_denial_send(send: Send) -> Send:
+    """Mirror of ``starlette.responses.Response._wrap_websocket_denial_send``.
+
+    Divergence #2 (see module docstring): inlined because the helper landed
+    on Starlette ``main`` (commit 9ee9519) after our minimum pin
+    ``starlette>=0.41.3``. Drop this once the floor moves past the release
+    that contains it.
+    """
+
+    async def wrapped(message: Message) -> None:
+        message_type = message["type"]
+        if message_type in {"http.response.start", "http.response.body"}:
+            message = {**message, "type": "websocket." + message_type}
+        await send(message)
+
+    return wrapped
 
 
 class SendTimeoutError(TimeoutError):
@@ -329,7 +376,13 @@ class EventSourceResponse(Response):
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def _listen_for_disconnect(self, receive: Receive) -> None:
-        """Watch for a disconnect message from the client."""
+        """Watch for a disconnect message from the client.
+
+        Divergence #1 (see module docstring): kept unconditionally instead of
+        adopting Starlette's ASGI 2.4 ``OSError → ClientDisconnect`` fast path,
+        because this loop drives ``client_close_handler_callable`` and flips
+        ``self.active = False`` for ``_ping`` and the shutdown grace loop.
+        """
         while self.active:
             message = await receive()
             if message["type"] == "http.disconnect":
@@ -413,25 +466,37 @@ class EventSourceResponse(Response):
         - _listen_for_exit_signal to respond to server shutdown
         - _listen_for_disconnect to respond to client disconnect
         """
-        async with anyio.create_task_group() as task_group:
-            # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
-            async def cancel_on_finish(coro: Callable[[], Awaitable[None]]):
-                await coro()
-                task_group.cancel_scope.cancel()
+        # WebSocket denial parity with Starlette's StreamingResponse: a
+        # streaming response on a websocket scope must wrap send so message
+        # types become ``websocket.http.response.*``.
+        if scope["type"] == "websocket":
+            send = _wrap_websocket_denial_send(send)
 
-            task_group.start_soon(cancel_on_finish, lambda: self._stream_response(send))
-            task_group.start_soon(cancel_on_finish, lambda: self._ping(send))
-            task_group.start_soon(
-                cancel_on_finish, self._listen_for_exit_signal_with_grace
-            )
+        # collapse_excgroups parity with Starlette's StreamingResponse: anyio
+        # v4 wraps task-group failures in ExceptionGroup; user middleware
+        # expects the bare exception.
+        with collapse_excgroups():
+            async with anyio.create_task_group() as task_group:
+                # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
+                async def cancel_on_finish(coro: Callable[[], Awaitable[None]]):
+                    await coro()
+                    task_group.cancel_scope.cancel()
 
-            if self.data_sender_callable:
-                task_group.start_soon(self.data_sender_callable)
+                task_group.start_soon(
+                    cancel_on_finish, lambda: self._stream_response(send)
+                )
+                task_group.start_soon(cancel_on_finish, lambda: self._ping(send))
+                task_group.start_soon(
+                    cancel_on_finish, self._listen_for_exit_signal_with_grace
+                )
 
-            # Wait for the client to disconnect last
-            task_group.start_soon(
-                cancel_on_finish, lambda: self._listen_for_disconnect(receive)
-            )
+                if self.data_sender_callable:
+                    task_group.start_soon(self.data_sender_callable)
+
+                # Wait for the client to disconnect last
+                task_group.start_soon(
+                    cancel_on_finish, lambda: self._listen_for_disconnect(receive)
+                )
 
         if self.background is not None:
             await self.background()

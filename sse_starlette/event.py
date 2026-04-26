@@ -86,8 +86,8 @@ class JSONServerSentEvent(ServerSentEvent):
 
 
 def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> bytes:
-    if isinstance(data, bytes):
-        return data
+    if isinstance(data, (bytes, memoryview)):
+        return bytes(data)
     if isinstance(data, ServerSentEvent):
         return data.encode()
     if isinstance(data, dict):

@@ -51,7 +51,11 @@ class TestIssue167ShutdownEvent:
 
             async def run_response():
                 with collapse_excgroups():
-                    await response({}, mock_receive, mock_send)
+                    await response(
+                        {"type": "http", "method": "GET", "headers": []},
+                        mock_receive,
+                        mock_send,
+                    )
 
             tg.start_soon(run_response)
             await anyio.sleep(0.3)
@@ -111,7 +115,11 @@ class TestIssue167ShutdownEvent:
 
             async def run_response():
                 with collapse_excgroups():
-                    await response({}, mock_receive, mock_send)
+                    await response(
+                        {"type": "http", "method": "GET", "headers": []},
+                        mock_receive,
+                        mock_send,
+                    )
 
             tg.start_soon(run_response)
             await anyio.sleep(0.3)
@@ -169,7 +177,11 @@ class TestIssue167ShutdownEvent:
 
                 async def run_response():
                     with collapse_excgroups():
-                        await response({}, mock_receive, mock_send)
+                        await response(
+                            {"type": "http", "method": "GET", "headers": []},
+                            mock_receive,
+                            mock_send,
+                        )
 
                 tg.start_soon(run_response)
                 await anyio.sleep(0.3)
@@ -216,7 +228,11 @@ class TestIssue167ShutdownEvent:
 
                 async def run_response():
                     with collapse_excgroups():
-                        await response({}, mock_receive, mock_send)
+                        await response(
+                            {"type": "http", "method": "GET", "headers": []},
+                            mock_receive,
+                            mock_send,
+                        )
 
                 tg.start_soon(run_response)
                 await anyio.sleep(0.3)
@@ -267,7 +283,11 @@ class TestIssue167ShutdownEvent:
 
                 async def run_response():
                     with collapse_excgroups():
-                        await response({}, mock_receive, mock_send)
+                        await response(
+                            {"type": "http", "method": "GET", "headers": []},
+                            mock_receive,
+                            mock_send,
+                        )
 
                 tg.start_soon(run_response)
                 await anyio.sleep(0.3)

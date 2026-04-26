@@ -3,6 +3,12 @@ import pytest
 from sse_starlette.event import ServerSentEvent, JSONServerSentEvent, ensure_bytes
 
 
+def test_ensure_bytes_whenMemoryview_thenReturnsBytes():
+    """Parity with Starlette's StreamingResponse: memoryview chunks pass through."""
+    mv = memoryview(b"hello")
+    assert ensure_bytes(mv, "\r\n") == b"hello"
+
+
 @pytest.mark.parametrize(
     "input, expected",
     [
