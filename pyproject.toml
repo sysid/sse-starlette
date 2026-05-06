@@ -65,6 +65,9 @@ experimentation = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/sysid/sse-starlette"
+Repository = "https://github.com/sysid/sse-starlette"
+Issues = "https://github.com/sysid/sse-starlette/issues"
 Source = "https://github.com/sysid/sse-starlette"
 
 [build-system]
