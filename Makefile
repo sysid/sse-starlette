@@ -8,9 +8,9 @@ pkg_src =  $(app_root)/sse_starlette
 tests_src = $(app_root)/tests
 
 .PHONY: all
-all: clean build publish  ## Build and publish
+all: clean build  ## Build (publishing is automated via tag push, see `release`)
 	@echo "--------------------------------------------------------------------------------"
-	@echo "-M- building and distributing"
+	@echo "-M- built; push a tag (make release) to publish via GitHub Actions"
 	@echo "--------------------------------------------------------------------------------"
 
 ################################################################################
@@ -30,7 +30,8 @@ build: clean format  ## format and build
 	uv build
 
 .PHONY: publish
-publish:  ## publish
+publish:  ## (fallback) manual PyPI upload via twine; prefer `make release` (OIDC via GH Actions)
+	@echo "WARNING: prefer `make release` — it tags & pushes, GH Actions publishes via PyPI Trusted Publishing."
 	@echo "upload to Pypi"
 	uv run twine upload --verbose dist/*
 
