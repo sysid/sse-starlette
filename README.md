@@ -12,6 +12,7 @@ Production ready Server-Sent Events implementation for Starlette and FastAPI fol
 
 ```bash
 pip install sse-starlette
+# or use uv 
 uv add sse-starlette
 
 # To run the examples (fastapi, uvicorn, pydantic)
