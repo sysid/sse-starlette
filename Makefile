@@ -90,9 +90,9 @@ test-experimentation:  ## run experimentation tests (requires --group experiment
 
 .PHONY: test-docker
 test-docker:  ## test-docker (docker desktop: advanced settings)
-	@if [ -S /var/run/docker.sock > /dev/null 2>&1 ]; then \
+	@if [ -S /var/run/docker.sock ]; then \
 		echo "Running docker tests because /var/run/docker.sock exists..."; \
-		RUN_ENV=local uv run python -m pytest -m "integration" tests; \
+		RUN_ENV=local uv run python -m pytest --ignore=tests/experimentation -m "integration" tests; \
 	else \
 		echo "Skipping tests: /var/run/docker.sock does not exist."; \
 	fi
