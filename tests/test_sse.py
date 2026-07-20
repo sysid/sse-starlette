@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 from functools import partial
+from types import SimpleNamespace
 
 import anyio
 import anyio.lowlevel
@@ -9,6 +10,7 @@ import pytest
 from starlette.background import BackgroundTask
 from starlette.testclient import TestClient
 
+from sse_starlette.event import ServerSentEvent
 from sse_starlette.sse import EventSourceResponse
 from sse_starlette.sse import SendTimeoutError
 from tests.anyio_compat import collapse_excgroups
@@ -36,7 +38,23 @@ def mock_memory_channels():
     return setup
 
 
+@pytest.fixture
+def disable_ping(monkeypatch):
+    """Keep serialization tests independent of wall-clock heartbeat timing.
+
+    Scheduler delays can move a real ping across an assertion boundary and make
+    an unrelated formatting test flaky. Ping cadence is covered separately with
+    controlled timer ticks, so these tests only need a cancellable ping task.
+    """
+
+    async def wait_until_cancelled(_response, _send):
+        await anyio.Event().wait()
+
+    monkeypatch.setattr(EventSourceResponse, "_ping", wait_until_cancelled)
+
+
 class TestEventSourceResponse:
+    @pytest.mark.usefixtures("disable_ping")
     @pytest.mark.parametrize(
         "input_type,separator,expected_output",
         [
@@ -68,7 +86,7 @@ class TestEventSourceResponse:
                 async for value in generator:
                     yield await format_output(value)
 
-            response = EventSourceResponse(generate(), ping=0.2, sep=separator)
+            response = EventSourceResponse(generate(), sep=separator)
             await response(scope, receive, send)
 
         # Act
@@ -77,8 +95,8 @@ class TestEventSourceResponse:
 
         # Assert
         assert expected_output in response.content
-        assert response.content.decode().count("ping") == 2
 
+    @pytest.mark.usefixtures("disable_ping")
     @pytest.mark.parametrize(
         "producer_output,expected_sse_response",
         [
@@ -135,7 +153,6 @@ class TestEventSourceResponse:
                 data_sender_callable=partial(
                     stream_numbers, send_chan, 1, 5
                 ),  # Producer writes to send channel
-                ping=0.2,
             )
             await response(scope, receive, send)
 
@@ -144,7 +161,6 @@ class TestEventSourceResponse:
         response = client.get("/")
 
         # Assert
-        assert response.content.decode().count("ping") == 2
         assert expected_sse_response in response.content
 
     @pytest.mark.anyio
@@ -236,6 +252,55 @@ class TestEventSourceResponse:
         assert len(content_type_headers) == 1
         header_name, header_value = content_type_headers[0]
         assert header_value == "text/event-stream; charset=utf-8"
+
+    @pytest.mark.anyio
+    async def test_ping_whenTimerTicks_thenSendsOneMessagePerTick(self, monkeypatch):
+        """Test ping cadence with logical ticks instead of elapsed wall time.
+
+        The fake sleep records every requested interval and yields at a
+        cooperative checkpoint so cancellation and task scheduling semantics are
+        preserved without making the assertion depend on machine load. Two ticks
+        verify that ping delivery is periodic rather than a one-shot operation.
+        """
+
+        # Arrange
+        ping_interval = 0.2
+        expected_ping_count = 2
+        sleep_intervals = []
+        sent_messages = []
+
+        async def counted_sleep(interval):
+            sleep_intervals.append(interval)
+            assert len(sleep_intervals) <= expected_ping_count
+            await anyio.lowlevel.checkpoint()
+
+        response = EventSourceResponse(
+            [],
+            ping=ping_interval,
+            ping_message_factory=lambda: ServerSentEvent(comment="ping"),
+        )
+
+        async def send(message):
+            sent_messages.append(message)
+            if len(sent_messages) == expected_ping_count:
+                response.active = False
+
+        monkeypatch.setattr(
+            "sse_starlette.sse.anyio",
+            SimpleNamespace(sleep=counted_sleep),
+        )
+
+        # Act
+        await response._ping(send)
+
+        # Assert
+        assert sleep_intervals == [ping_interval] * expected_ping_count
+        expected_ping_message = {
+            "type": "http.response.body",
+            "body": b": ping\r\n\r\n",
+            "more_body": True,
+        }
+        assert sent_messages == [expected_ping_message] * expected_ping_count
 
     @pytest.mark.anyio
     async def test_ping_whenConcurrentWithEvents_thenRespectsLocking(self):
