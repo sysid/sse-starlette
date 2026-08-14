@@ -14,6 +14,7 @@ anyio.create_task_group()
    |
    +-- cancel_on_finish(_stream_response)      # pushes SSE data to client
    +-- cancel_on_finish(_ping)                 # keepalive pings every ~15s
+   |                                           # (skipped entirely when ping=0)
    +-- cancel_on_finish(_listen_for_exit_signal_with_grace)  # server shutdown
    +-- cancel_on_finish(_listen_for_disconnect) # client disconnect
    |   (+ optional: data_sender_callable)

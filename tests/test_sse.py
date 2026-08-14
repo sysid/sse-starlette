@@ -369,8 +369,55 @@ class TestEventSourceResponse:
         negative_interval = -42
 
         # Act & Assert
-        with pytest.raises(ValueError, match="ping interval must be greater than 0"):
+        with pytest.raises(ValueError, match=r"ping interval must be >= 0"):
             response.ping_interval = negative_interval
+
+    def test_pingInterval_whenZero_thenAcceptedAsDisabled(self):
+        # Arrange
+        response = EventSourceResponse(0)
+
+        # Act
+        response.ping_interval = 0
+
+        # Assert
+        assert response.ping_interval == 0
+
+    @pytest.mark.anyio
+    async def test_ping_whenIntervalIsZero_thenNoPingTaskIsStarted(self):
+        """Issue #206: ping=0 must disable pings, not busy-spin on sleep(0).
+
+        Before the fix, ``_ping`` looped on ``anyio.sleep(0)`` — a bare
+        checkpoint — emitting tens of thousands of pings per second and
+        contending for ``_send_lock`` with the data stream.
+        """
+
+        # Arrange
+        async def gen():
+            for i in range(3):
+                await anyio.sleep(0.01)
+                yield {"data": i}
+
+        response = EventSourceResponse(gen(), ping=0)
+        bodies = []
+
+        async def send(message):
+            if message["type"] == "http.response.body":
+                bodies.append(message["body"])
+
+        async def receive():
+            await anyio.sleep(math.inf)
+            return {"type": "http.disconnect"}  # pragma: no cover
+
+        # Act
+        await response({"type": "http", "method": "GET", "headers": []}, receive, send)
+
+        # Assert
+        assert not any(b": ping" in body for body in bodies)
+        assert [b for b in bodies if b] == [
+            b"data: 0\r\n\r\n",
+            b"data: 1\r\n\r\n",
+            b"data: 2\r\n\r\n",
+        ]
 
     def test_compression_whenEnabled_thenRaisesNotImplemented(self):
         # Arrange

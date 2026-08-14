@@ -259,7 +259,7 @@ cancellation on server shutdown.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `content` | `ContentStream` | Required | Async generator or iterable |
-| `ping` | `int` | 15 | Ping interval in seconds (0 to disable) |
+| `ping` | `int` | 15 | Ping interval in seconds (`0` disables keep-alive pings) |
 | `sep` | `str` | `"\r\n"` | Line separator (`\r\n`, `\r`, `\n`) |
 | `send_timeout` | `float` | `None` | Send operation timeout in seconds |
 | `headers` | `dict` | `None` | Additional HTTP headers |
