@@ -371,7 +371,7 @@ class EventSourceResponse(Response):
             try:
                 await self._send_with_timeout(
                     send,
-                    {"type": "http.response.body", "body": chunk, "more_body": True}
+                    {"type": "http.response.body", "body": chunk, "more_body": True},
                 )
             except SendTimeoutError:
                 aclose = getattr(self.body_iterator, "aclose", None)
@@ -465,7 +465,7 @@ class EventSourceResponse(Response):
                             "type": "http.response.body",
                             "body": ping_bytes,
                             "more_body": True,
-                        }
+                        },
                     )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
