@@ -328,6 +328,49 @@ class TestEventSourceResponse:
                 await response._ping(blocked_send)
 
     @pytest.mark.anyio
+    async def test_ping_whenSendTimesOut_thenTearsDownResponseAndRunsCleanup(self):
+        """A heartbeat timeout must tear down the whole response, not just _ping.
+
+        This is the frozen-client case the send timeout exists for: the peer keeps
+        the socket open but stops reading, so no http.disconnect ever arrives and
+        the heartbeat is the only traffic. Unlike the unit test above, this drives
+        the full ASGI entrypoint and asserts the generator's cleanup still runs.
+        """
+
+        # Arrange
+        cleanup_executed = False
+
+        async def event_publisher():
+            try:
+                await anyio.sleep_forever()
+                yield {"event": "test", "data": "data"}
+            finally:
+                nonlocal cleanup_executed
+                cleanup_executed = True
+
+        async def mock_send(message):
+            if message["type"] == "http.response.start":
+                return
+            await anyio.sleep_forever()
+
+        async def mock_receive():
+            await anyio.sleep_forever()
+
+        response = EventSourceResponse(event_publisher(), ping=0.05, send_timeout=0.05)
+
+        # Act & Assert
+        with anyio.fail_after(5):
+            with pytest.raises(SendTimeoutError):
+                with collapse_excgroups():
+                    await response(
+                        {"type": "http", "method": "GET", "headers": []},
+                        mock_receive,
+                        mock_send,
+                    )
+
+        assert cleanup_executed, "Generator cleanup must run when a heartbeat times out"
+
+    @pytest.mark.anyio
     async def test_ping_whenConcurrentWithEvents_thenRespectsLocking(self):
         # Sequencing here is as follows to reproduce race condition:
         # t=0.5s - event_publisher sends the first response item,
