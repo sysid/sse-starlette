@@ -245,7 +245,7 @@ class EventSourceResponse(Response):
         sep: Line separator for SSE messages ("\\r\\n", "\\r", or "\\n").
         ping_message_factory: Callable returning custom ping ServerSentEvent.
         data_sender_callable: Async callable for push-based data sending.
-        send_timeout: Timeout in seconds for individual send operations.
+        send_timeout: Timeout in seconds for individual data or heartbeat sends.
         client_close_handler_callable: Async callback on client disconnect.
         shutdown_event: Optional ``anyio.Event`` set by the library when server
             shutdown is detected. Generators can watch this event to send farewell
@@ -347,6 +347,14 @@ class EventSourceResponse(Response):
     def enable_compression(self, force: bool = False) -> None:
         raise NotImplementedError("Compression is not supported for SSE streams.")
 
+    async def _send_with_timeout(self, send: Send, message: Message) -> None:
+        """Send one ASGI message, applying the response's per-send timeout."""
+        with anyio.move_on_after(self.send_timeout) as cancel_scope:
+            await send(message)
+
+        if cancel_scope and cancel_scope.cancel_called:
+            raise SendTimeoutError()
+
     async def _stream_response(self, send: Send) -> None:
         """Send out SSE data to the client as it becomes available in the iterator."""
         await send(
@@ -360,12 +368,12 @@ class EventSourceResponse(Response):
         async for data in self.body_iterator:
             chunk = ensure_bytes(data, self.sep)
             logger.debug("chunk: %s", chunk)
-            with anyio.move_on_after(self.send_timeout) as cancel_scope:
-                await send(
+            try:
+                await self._send_with_timeout(
+                    send,
                     {"type": "http.response.body", "body": chunk, "more_body": True}
                 )
-
-            if cancel_scope and cancel_scope.cancel_called:
+            except SendTimeoutError:
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
                     await aclose()
@@ -451,7 +459,8 @@ class EventSourceResponse(Response):
 
             async with self._send_lock:
                 if self.active:
-                    await send(
+                    await self._send_with_timeout(
+                        send,
                         {
                             "type": "http.response.body",
                             "body": ping_bytes,
