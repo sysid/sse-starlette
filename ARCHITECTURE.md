@@ -194,6 +194,11 @@ _stream_response                    _exit_signal_with_grace
 
 ## Flow 5: Send Timeout
 
+`send_timeout` is applied by `_send_with_timeout()`, which both writing tasks
+share. There are therefore **two** origins, and they clean up differently.
+
+### 5a: Data send times out
+
 ```
 _stream_response         _ping        _exit_signal    _disconnect
       |                    |               |               |
@@ -203,13 +208,48 @@ _stream_response         _ping        _exit_signal    _disconnect
         [send hangs!]      |               |               |
            ...             |               |               |
     [timeout expires]      |               |               |
-    cancel_called = True   |               |               |
+    timeout detected       |               |               |
     aclose() iterator      |               |               |
     raise SendTimeoutError |               |               |
       |                    |               |               |
   EXCEPTION propagates through cancel_on_finish into task group
   Task group cancels all siblings
 ```
+
+### 5b: Heartbeat send times out (idle stream)
+
+The case `send_timeout` exists for: the client keeps the socket open but stops
+reading, so no `http.disconnect` ever arrives and the heartbeat is the only
+traffic. Before this path was covered, `_ping` blocked forever *while holding
+`_send_lock`*, which also deadlocked `_stream_response`'s terminal send.
+
+```
+_stream_response         _ping        _exit_signal    _disconnect
+      |                    |               |               |
+  suspended in       await sleep(interval) |               |
+  __anext__()             |                |               |
+  (generator idle)   async with _send_lock:|               |
+      |              move_on_after(timeout):               |
+      |                send(ping)          |               |
+      |                  [send hangs!]     |               |
+      |              [timeout expires]     |               |
+      |              timeout detected      |               |
+      |              raise SendTimeoutError|               |
+      |                    |               |               |
+  EXCEPTION propagates through cancel_on_finish into task group
+  Task group cancels all siblings
+      |                    |               |               |
+  CancelledError thrown into the suspended __anext__
+  Generator's finally block runs
+```
+
+**Why 5b does not `aclose()` the iterator.** `_stream_response` can close the
+iterator explicitly because it owns it and is not inside it at that moment.
+`_ping` cannot: `_stream_response` is typically suspended inside
+`body_iterator.__anext__()`, where `ag_running_async` is set, and `aclose()`
+would raise `RuntimeError: aclose(): asynchronous generator is already running`.
+Cancellation already finalizes the generator, so the ping path relies on that.
+Asserted by `test_ping_whenSendTimesOut_thenTearsDownResponseAndRunsCleanup`.
 
 ---
 
@@ -269,5 +309,6 @@ One watcher per thread broadcasts to all connections in that thread.
 | Server shutdown (no grace) | `_listen_for_exit_signal_with_grace` | CancelledError |
 | Server shutdown (with grace, generator cooperates) | `_stream_response` | Clean exit, farewell sent |
 | Server shutdown (with grace, generator ignores) | `_listen_for_exit_signal_with_grace` (after timeout) | CancelledError |
-| Send timeout | `_stream_response` (via exception) | SendTimeoutError |
+| Send timeout (data) | `_stream_response` (via exception) | SendTimeoutError, iterator `aclose()`d |
+| Send timeout (heartbeat) | `_ping` (via exception) | SendTimeoutError, finalized by task-group cancellation |
 | Client disconnect during grace | `_listen_for_disconnect` | Grace period cut short |

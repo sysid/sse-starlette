@@ -459,6 +459,16 @@ class EventSourceResponse(Response):
 
             async with self._send_lock:
                 if self.active:
+                    # A SendTimeoutError raised here deliberately does NOT
+                    # aclose() the body iterator, unlike _stream_response. When a
+                    # heartbeat times out, _stream_response is normally suspended
+                    # inside body_iterator.__anext__(), where ag_running_async is
+                    # set, so aclose() would raise "RuntimeError: aclose():
+                    # asynchronous generator is already running" (verified).
+                    # Propagating instead lets the task group cancel
+                    # _stream_response, which throws into the suspended
+                    # __anext__ and runs the generator's finally block -- see
+                    # test_ping_whenSendTimesOut_thenTearsDownResponseAndRunsCleanup.
                     await self._send_with_timeout(
                         send,
                         {
