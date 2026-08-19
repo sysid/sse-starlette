@@ -2,7 +2,6 @@ import asyncio
 import logging
 import math
 from functools import partial
-from types import SimpleNamespace
 
 import anyio
 import anyio.lowlevel
@@ -285,10 +284,7 @@ class TestEventSourceResponse:
             if len(sent_messages) == expected_ping_count:
                 response.active = False
 
-        monkeypatch.setattr(
-            "sse_starlette.sse.anyio",
-            SimpleNamespace(sleep=counted_sleep),
-        )
+        monkeypatch.setattr("sse_starlette.sse.anyio.sleep", counted_sleep)
 
         # Act
         await response._ping(send)
@@ -301,6 +297,19 @@ class TestEventSourceResponse:
             "more_body": True,
         }
         assert sent_messages == [expected_ping_message] * expected_ping_count
+
+    @pytest.mark.anyio
+    async def test_ping_whenSendTimesOut_thenRaisesSendTimeoutError(self):
+        """Heartbeats must honor the response's per-send timeout."""
+
+        response = EventSourceResponse([], ping=0.01, send_timeout=0.01)
+
+        async def blocked_send(_message):
+            await anyio.sleep_forever()
+
+        with anyio.fail_after(0.1):
+            with pytest.raises(SendTimeoutError):
+                await response._ping(blocked_send)
 
     @pytest.mark.anyio
     async def test_ping_whenConcurrentWithEvents_thenRespectsLocking(self):
