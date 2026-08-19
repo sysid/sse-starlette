@@ -377,7 +377,7 @@ class EventSourceResponse(Response):
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
                     await aclose()
-                raise SendTimeoutError()
+                raise
 
         async with self._send_lock:
             self.active = False
