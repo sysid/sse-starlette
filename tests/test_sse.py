@@ -299,15 +299,31 @@ class TestEventSourceResponse:
         assert sent_messages == [expected_ping_message] * expected_ping_count
 
     @pytest.mark.anyio
-    async def test_ping_whenSendTimesOut_thenRaisesSendTimeoutError(self):
-        """Heartbeats must honor the response's per-send timeout."""
+    async def test_ping_whenSendTimesOut_thenRaisesSendTimeoutError(self, monkeypatch):
+        """Heartbeats must honor the response's per-send timeout.
 
-        response = EventSourceResponse([], ping=0.01, send_timeout=0.01)
+        The ping interval is advanced by a logical tick, following
+        test_ping_whenTimerTicks_thenSendsOneMessagePerTick, so send_timeout is
+        the only real timer in play and the result does not depend on machine
+        load. fail_after is a hang watchdog, not an assertion, so it is set
+        generously.
+        """
+
+        # Arrange
+        send_timeout = 0.05
+
+        async def instant_sleep(_interval):
+            await anyio.lowlevel.checkpoint()
+
+        monkeypatch.setattr("sse_starlette.sse.anyio.sleep", instant_sleep)
+
+        response = EventSourceResponse([], ping=10, send_timeout=send_timeout)
 
         async def blocked_send(_message):
             await anyio.sleep_forever()
 
-        with anyio.fail_after(0.1):
+        # Act & Assert
+        with anyio.fail_after(5):
             with pytest.raises(SendTimeoutError):
                 await response._ping(blocked_send)
 
