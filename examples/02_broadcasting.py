@@ -47,6 +47,14 @@ from starlette.requests import Request
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 
+class _ClientDisconnect:
+    """Sentinel used to terminate an evicted client's stream."""
+
+
+_DISCONNECT = _ClientDisconnect()
+_QueueItem = ServerSentEvent | _ClientDisconnect
+
+
 class BroadcastStream:
     """
     Stream that connects a client to a broadcaster for receiving SSE events.
@@ -58,7 +66,7 @@ class BroadcastStream:
     def __init__(self, request: Request, broadcaster: "MessageBroadcaster"):
         self.request = request
         self.broadcaster = broadcaster
-        self.queue: Optional[asyncio.Queue] = None
+        self.queue: Optional[asyncio.Queue[_QueueItem]] = None
         self._registered = False
 
     def __aiter__(self) -> "BroadcastStream":
@@ -83,14 +91,19 @@ class BroadcastStream:
         """
         try:
             if await self.request.is_disconnected():
-                await self._cleanup()
                 raise StopAsyncIteration
 
             # Wait for next message from broadcaster
             # This blocks until a message is broadcast to all clients
+            assert self.queue is not None
             message = await self.queue.get()
+            if isinstance(message, _ClientDisconnect):
+                raise StopAsyncIteration
             return message
 
+        except asyncio.CancelledError:
+            await self._cleanup()
+            raise
         except Exception:
             await self._cleanup()
             raise
@@ -115,18 +128,23 @@ class MessageBroadcaster:
     - Backpressure: individual queues can be managed independently
     """
 
-    def __init__(self):
-        self._clients: List[asyncio.Queue] = []
+    def __init__(self, max_queue_size: int = 100):
+        if max_queue_size <= 0:
+            raise ValueError("max_queue_size must be greater than zero")
+        self._max_queue_size = max_queue_size
+        self._clients: List[asyncio.Queue[_QueueItem]] = []
 
-    def add_client(self) -> asyncio.Queue:
+    def add_client(self) -> asyncio.Queue[_QueueItem]:
         """
         Register a new client and return their dedicated message queue.
         """
-        client_queue = asyncio.Queue()
+        client_queue: asyncio.Queue[_QueueItem] = asyncio.Queue(
+            maxsize=self._max_queue_size
+        )
         self._clients.append(client_queue)
         return client_queue
 
-    def remove_client(self, client_queue: asyncio.Queue) -> None:
+    def remove_client(self, client_queue: asyncio.Queue[_QueueItem]) -> None:
         """
         Remove a disconnected client's queue.
 
@@ -136,6 +154,16 @@ class MessageBroadcaster:
         if client_queue in self._clients:
             self._clients.remove(client_queue)
 
+    def disconnect_client(self, client_queue: asyncio.Queue[_QueueItem]) -> None:
+        """Evict a slow client and terminate its stream immediately."""
+        self.remove_client(client_queue)
+
+        # A full queue cannot accept the disconnect sentinel. Discard buffered
+        # events because this client's stream is being terminated anyway.
+        while not client_queue.empty():
+            client_queue.get_nowait()
+        client_queue.put_nowait(_DISCONNECT)
+
     async def broadcast(self, message: str, event: Optional[str] = None) -> None:
         """
         Send a message to ALL connected clients simultaneously.
@@ -143,9 +171,10 @@ class MessageBroadcaster:
         This creates one ServerSentEvent and puts it into every client's queue.
         Each client's BroadcastStream will then yield this event independently.
 
-        Design choice: We use put_nowait() to avoid blocking if a client's
-        queue is full. In production, you might want to handle QueueFull
-        exceptions by either dropping the message or disconnecting slow clients.
+        Design choice: We use bounded queues and put_nowait() so a slow client
+        cannot consume unbounded memory or block delivery to healthy clients.
+        A client whose queue fills is disconnected because dropping events could
+        leave it with an incomplete event history.
         """
         if not self._clients:
             return
@@ -162,7 +191,7 @@ class MessageBroadcaster:
                 disconnected_clients.append(client_queue)
 
         for client_queue in disconnected_clients:
-            self.remove_client(client_queue)
+            self.disconnect_client(client_queue)
 
     def create_stream(self, request: Request) -> BroadcastStream:
         """
