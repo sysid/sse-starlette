@@ -1566,7 +1566,7 @@ asyncio = [
 
 [[package]]
 name = "sse-starlette"
-version = "3.4.8"
+version = "3.4.10"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
