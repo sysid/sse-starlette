@@ -2,10 +2,10 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-import httpx
+import httpx2 as httpx
 import pytest
 from asgi_lifespan import LifespanManager
-from httpx import ASGITransport
+from httpx2 import ASGITransport
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -19,8 +19,8 @@ log_fmt = r"%(asctime)-15s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(mess
 datefmt = "%Y-%m-%d %H:%M:%S"
 logging.basicConfig(format=log_fmt, level=logging.DEBUG, datefmt=datefmt)
 
-logging.getLogger("httpx").setLevel(logging.INFO)
-logging.getLogger("httpcore").setLevel(logging.INFO)
+logging.getLogger("httpx2").setLevel(logging.INFO)
+logging.getLogger("httpcore2").setLevel(logging.INFO)
 logging.getLogger("urllib3").setLevel(logging.INFO)
 logging.getLogger("docker").setLevel(logging.INFO)
 
