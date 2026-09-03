@@ -267,7 +267,7 @@ class EventSourceResponse(Response):
         headers: Optional[Mapping[str, str]] = None,
         media_type: str = "text/event-stream",
         background: Optional[BackgroundTask] = None,
-        ping: Optional[int] = None,
+        ping: Optional[Union[int, float]] = None,
         sep: Optional[str] = None,
         ping_message_factory: Optional[Callable[[], ServerSentEvent]] = None,
         data_sender_callable: Optional[
@@ -435,7 +435,7 @@ class EventSourceResponse(Response):
 
     async def _ping(self, send: Send) -> None:
         """Periodically send ping messages to keep the connection alive on proxies.
-        - frequenccy ca every 15 seconds.
+        - frequency ca every 15 seconds.
         - Alternatively one can send periodically a comment line (one starting with a ':' character)
 
         Invariant (Issue #206): must NOT be started when ``ping_interval == 0``

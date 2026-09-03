@@ -38,23 +38,7 @@ def mock_memory_channels():
     return setup
 
 
-@pytest.fixture
-def disable_ping(monkeypatch):
-    """Keep serialization tests independent of wall-clock heartbeat timing.
-
-    Scheduler delays can move a real ping across an assertion boundary and make
-    an unrelated formatting test flaky. Ping cadence is covered separately with
-    controlled timer ticks, so these tests only need a cancellable ping task.
-    """
-
-    async def wait_until_cancelled(_response, _send):
-        await anyio.Event().wait()
-
-    monkeypatch.setattr(EventSourceResponse, "_ping", wait_until_cancelled)
-
-
 class TestEventSourceResponse:
-    @pytest.mark.usefixtures("disable_ping")
     @pytest.mark.parametrize(
         "input_type,separator,expected_output",
         [
@@ -86,7 +70,8 @@ class TestEventSourceResponse:
                 async for value in generator:
                     yield await format_output(value)
 
-            response = EventSourceResponse(generate(), sep=separator)
+            # ping=0: keep serialization assertions independent of heartbeat timing
+            response = EventSourceResponse(generate(), sep=separator, ping=0)
             await response(scope, receive, send)
 
         # Act
@@ -96,7 +81,6 @@ class TestEventSourceResponse:
         # Assert
         assert expected_output in response.content
 
-    @pytest.mark.usefixtures("disable_ping")
     @pytest.mark.parametrize(
         "producer_output,expected_sse_response",
         [
@@ -153,6 +137,7 @@ class TestEventSourceResponse:
                 data_sender_callable=partial(
                     stream_numbers, send_chan, 1, 5
                 ),  # Producer writes to send channel
+                ping=0,  # keep assertions independent of heartbeat timing
             )
             await response(scope, receive, send)
 
