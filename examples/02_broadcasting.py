@@ -101,12 +101,21 @@ class BroadcastStream:
                 raise StopAsyncIteration
             return message
 
-        except asyncio.CancelledError:
+        except BaseException:
+            # BaseException on purpose: asyncio.CancelledError is not an
+            # Exception, and cancellation is how EventSourceResponse stops
+            # this stream on client disconnect.
             await self._cleanup()
             raise
-        except Exception:
-            await self._cleanup()
-            raise
+
+    async def aclose(self) -> None:
+        """
+        Close the stream like an async generator would.
+
+        EventSourceResponse calls aclose() on the body iterator when a send
+        times out. Without this method a timed-out client stays registered.
+        """
+        await self._cleanup()
 
     async def _cleanup(self):
         """
@@ -173,8 +182,11 @@ class MessageBroadcaster:
 
         Design choice: We use bounded queues and put_nowait() so a slow client
         cannot consume unbounded memory or block delivery to healthy clients.
-        A client whose queue fills is disconnected because dropping events could
-        leave it with an incomplete event history.
+        A client whose queue fills is disconnected rather than having events
+        dropped. Either way it misses events; disconnecting makes the gap
+        visible so the client can reconnect and resync. This example sends no
+        event ids, so a real application should add ids and honor
+        Last-Event-ID to make that resync possible.
         """
         if not self._clients:
             return
