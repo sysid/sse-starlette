@@ -94,3 +94,42 @@ async def test_aclose_whenCalled_thenClientRemoved(broadcasting_example):
     await stream.aclose()
 
     assert broadcaster.client_count == 0
+
+
+async def test_anext_whenCalledAfterAclose_thenRaisesStopAsyncIteration(
+    broadcasting_example,
+):
+    # A closed stream must be terminal like a real async generator. Without a
+    # closed flag __anext__ awaits a queue nobody feeds any more and parks
+    # forever, because aclose() unregistered it from the broadcaster.
+    broadcaster = broadcasting_example.MessageBroadcaster()
+    stream = broadcaster.create_stream(ConnectedRequest())
+    stream.__aiter__()
+    await stream.aclose()
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(anext(stream), timeout=0.1)
+
+
+async def test_aiter_whenCalledAfterAclose_thenStreamStaysUnregistered(
+    broadcasting_example,
+):
+    # Re-entering __aiter__ on a closed stream would hand out a second queue
+    # and register it, resurrecting a client that already went away.
+    broadcaster = broadcasting_example.MessageBroadcaster()
+    stream = broadcaster.create_stream(ConnectedRequest())
+    stream.__aiter__()
+    await stream.aclose()
+
+    stream.__aiter__()
+
+    assert broadcaster.client_count == 0
+
+
+@pytest.mark.parametrize("max_queue_size", [0, -1])
+def test_init_whenMaxQueueSizeNotPositive_thenRaisesValueError(
+    broadcasting_example, max_queue_size
+):
+    # maxsize=0 means unbounded in asyncio, which is the bug this example had.
+    with pytest.raises(ValueError, match="max_queue_size"):
+        broadcasting_example.MessageBroadcaster(max_queue_size=max_queue_size)

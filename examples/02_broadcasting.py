@@ -68,6 +68,7 @@ class BroadcastStream:
         self.broadcaster = broadcaster
         self.queue: Optional[asyncio.Queue[_QueueItem]] = None
         self._registered = False
+        self._closed = False
 
     def __aiter__(self) -> "BroadcastStream":
         """
@@ -77,7 +78,9 @@ class BroadcastStream:
         with the broadcaster here rather than in __init__ to ensure
         we only create the queue when actually needed.
         """
-        if not self._registered:
+        # A closed stream stays closed: re-registering would resurrect a
+        # client the broadcaster has already dropped.
+        if not self._closed and not self._registered:
             self.queue = self.broadcaster.add_client()
             self._registered = True
         return self
@@ -89,6 +92,9 @@ class BroadcastStream:
         EventSourceResponse calls this repeatedly to get the stream of events.
         We check for client disconnection and clean up properly when needed.
         """
+        if self._closed:
+            raise StopAsyncIteration
+
         try:
             if await self.request.is_disconnected():
                 raise StopAsyncIteration
@@ -120,7 +126,13 @@ class BroadcastStream:
     async def _cleanup(self):
         """
         Explicit cleanup method to remove this client from broadcaster.
+
+        Also marks the stream closed. Every path that reaches cleanup is
+        terminal, and a closed stream must stay closed: otherwise a later
+        __anext__ would park forever on a queue the broadcaster no longer
+        feeds, and __aiter__ would hand out a fresh one.
         """
+        self._closed = True
         if self._registered and self.queue:
             self.broadcaster.remove_client(self.queue)
             self._registered = False
