@@ -125,13 +125,14 @@ async def _shutdown_watcher() -> None:
             # Check our flag (monkey-patch worked or manually set)
             if AppStatus.should_exit:
                 break
-            # Check uvicorn's flag directly (monkey-patch failed - Issue #132)
+            # Check uvicorn's flag directly (monkey-patch failed - Issue #132).
+            # Issue #211: do NOT copy it into the process-global AppStatus.should_exit;
+            # nothing resets it, so every later server in the process would be cancelled.
             if (
                 AppStatus.enable_automatic_graceful_drain
                 and uvicorn_server is not None
                 and uvicorn_server.should_exit
             ):
-                AppStatus.should_exit = True  # Sync state for consistency
                 break
             await anyio.sleep(0.5)
 
