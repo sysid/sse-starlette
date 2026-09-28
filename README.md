@@ -289,18 +289,18 @@ async def monitored_stream(request):
 
 ## Testing
 
-sse-starlette includes now comprehensive test isolation without manual setup. The library automatically handles event loop contexts, eliminating the need for manual state resets:
+Shutdown state is kept per thread and per server, so tests need no manual reset in the common case. That includes suites that start a real uvicorn server per test and stop it programmatically (`server.should_exit = True`): a stopped server does not affect streams served by a later one in the same process.
+
+One exception: a real `SIGTERM`/`SIGINT` delivered to the process sets the process-wide `AppStatus.should_exit`, and nothing clears it (the process is expected to exit). If your tests send real signals to an in-process server and keep running, reset the flag between tests:
 
 ```python
-# this is deprecated and not needed since version 3.0.0
 import pytest
-from sse_starlette import EventSourceResponse
+from sse_starlette.sse import AppStatus
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def reset_sse_app_status():
-    AppStatus.should_exit_event = None
     yield
-    AppStatus.should_exit_event = None
+    AppStatus.should_exit = False
 ```
 
 ## Production Considerations

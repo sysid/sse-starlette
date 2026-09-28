@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, List
 import pytest
-import httpx
+import httpx2 as httpx
 import uvicorn
 from asyncio import timeout
 import portend

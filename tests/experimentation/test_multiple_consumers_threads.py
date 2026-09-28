@@ -7,7 +7,7 @@ import time
 from functools import partial
 from pathlib import Path
 
-import httpx
+import httpx2 as httpx
 import psutil
 import pytest
 
@@ -93,9 +93,12 @@ def terminate_server():
             server_ready_event.clear()
 
 
-async def make_arequest(url, expected_lines=2):
+async def make_arequest(url) -> int:
     """Simulate Client:
-    Stream the SSE endpoint, and count the number of lines received.
+    Stream the SSE endpoint, and return the number of lines received.
+
+    Returns the count instead of asserting: an assert inside a consumer thread
+    only surfaces as a PytestUnhandledThreadExceptionWarning, the test would pass.
     """
     _log.info(f"{threading.current_thread().ident}: Starting making requests to {url=}")
     i = 0
@@ -110,43 +113,39 @@ async def make_arequest(url, expected_lines=2):
                     i += 1
         except httpx.RemoteProtocolError as e:
             _log.error(e)
-        finally:
-            assert i == expected_lines, (
-                f"Expected {expected_lines} lines"
-            )  # not part of test runner, failure is not reported
 
-        _log.info(
-            f"{threading.current_thread().ident}: Stopping making requests to {url=}, finished after {i=} responses."
-        )
-        # expected output lines:
-        # i=0, line='data: 1'
-        # i=1, line=''
-        # ...
-        assert i == expected_lines, (  # TODO: racy between 8-12
-            f"Expected {expected_lines} lines"
-        )  # not part of test runner, failure is not reported
+    _log.info(
+        f"{threading.current_thread().ident}: Stopping making requests to {url=}, finished after {i=} responses."
+    )
+    # expected output lines:
+    # i=0, line='data: 1'
+    # i=1, line=''
+    # ...
+    return i
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows")
 @pytest.mark.experimentation
 @pytest.mark.parametrize(
-    ("server_command", "expected_lines"),
+    ("server_command", "min_lines", "max_lines"),
     [
         (
             "uvicorn tests.integration.main_endless:app --host localhost --port {port} --log-level {log_level}",
             # 4 events at t=0/0.3/0.6/0.9 (× 2 aiter_lines per SSE event:
-            # 'data: N' + ''), all delivered before terminate_server() at t=1.0.
-            # Events emitted after the SIGTERM are racy against the watcher's
-            # 0.5s poll, so this is the deterministic floor.
+            # 'data: N' + ''), all delivered before terminate_server() at t=1.0:
+            # deterministic floor of 8. Events at t=1.2/1.5 race the watcher's
+            # 0.5s poll detecting the SIGTERM: up to 2 more events.
             8,
+            12,
         ),
         (
             "uvicorn tests.integration.main_endless_conditional:app --host localhost --port {port} --log-level {log_level}",
             2,
+            2,
         ),
     ],
 )
-def test_stop_server_with_many_consumers(caplog, server_command, expected_lines):
+def test_stop_server_with_many_consumers(caplog, server_command, min_lines, max_lines):
     # Given
     caplog.set_level(logging.DEBUG)
     N_CONSUMER = 3
@@ -164,11 +163,12 @@ def test_stop_server_with_many_consumers(caplog, server_command, expected_lines)
         pytest.fail("Server did not start.")
 
     # Initialize threads
+    line_counts: list[int] = []  # list.append is thread-safe
     threads = []
     for _ in range(N_CONSUMER):
         thread = threading.Thread(
-            target=lambda: asyncio.run(
-                make_arequest(f"{URL}:{port}/endless", expected_lines=expected_lines)
+            target=lambda: line_counts.append(
+                asyncio.run(make_arequest(f"{URL}:{port}/endless"))
             )
         )
         threads.append(thread)
@@ -187,6 +187,12 @@ def test_stop_server_with_many_consumers(caplog, server_command, expected_lines)
         thread.join()
 
     server_thread.join()  # Ensure server thread is cleaned up
+
+    # Then: every consumer received the events sent before the shutdown
+    assert len(line_counts) == N_CONSUMER, f"Consumer threads crashed: {line_counts=}"
+    assert all(min_lines <= n <= max_lines for n in line_counts), (
+        f"Expected {min_lines}..{max_lines} lines per consumer, got {line_counts}"
+    )
 
     # Then: Consumers report errors
     time.sleep(0.5)

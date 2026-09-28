@@ -118,20 +118,24 @@ async def _shutdown_watcher() -> None:
     When either becomes True, signals all registered events.
     """
     state = _get_shutdown_state()
-    uvicorn_server = _get_uvicorn_server()
 
     try:
         while True:
+            # Re-resolve each poll (Issue #211): a watcher can outlive the server it
+            # first saw. uvicorn restores the SIGTERM handler only after serve()
+            # returns, so a draining server is still found here.
+            uvicorn_server = _get_uvicorn_server()
             # Check our flag (monkey-patch worked or manually set)
             if AppStatus.should_exit:
                 break
-            # Check uvicorn's flag directly (monkey-patch failed - Issue #132)
+            # Check uvicorn's flag directly (monkey-patch failed - Issue #132).
+            # Issue #211: do NOT copy it into the process-global AppStatus.should_exit;
+            # nothing resets it, so every later server in the process would be cancelled.
             if (
                 AppStatus.enable_automatic_graceful_drain
                 and uvicorn_server is not None
                 and uvicorn_server.should_exit
             ):
-                AppStatus.should_exit = True  # Sync state for consistency
                 break
             await anyio.sleep(0.5)
 

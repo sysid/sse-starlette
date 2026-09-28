@@ -144,8 +144,8 @@ class TestShutdownWatcherDualSource:
                 with anyio.fail_after(2):
                     await event.wait()
 
-        # AppStatus.should_exit should be synced
-        assert AppStatus.should_exit is True
+        # Issue #211: server-scoped exit must not latch the process-global flag
+        assert AppStatus.should_exit is False
 
     @pytest.mark.asyncio
     async def test_fallback_when_no_uvicorn_server(self):
