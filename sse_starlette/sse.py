@@ -118,10 +118,13 @@ async def _shutdown_watcher() -> None:
     When either becomes True, signals all registered events.
     """
     state = _get_shutdown_state()
-    uvicorn_server = _get_uvicorn_server()
 
     try:
         while True:
+            # Re-resolve each poll (Issue #211): a watcher can outlive the server it
+            # first saw. uvicorn restores the SIGTERM handler only after serve()
+            # returns, so a draining server is still found here.
+            uvicorn_server = _get_uvicorn_server()
             # Check our flag (monkey-patch worked or manually set)
             if AppStatus.should_exit:
                 break

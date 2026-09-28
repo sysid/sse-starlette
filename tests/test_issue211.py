@@ -9,6 +9,11 @@ cancelled before its first event. The client sees a truncated chunked body.
 
 Typical trigger: a test suite that starts a real uvicorn server per test.
 
+Second failure mode: the watcher resolved the uvicorn server once at start. A
+watcher still sleeping when server1 stops outlives it; server2's streams then
+register on that watcher, which sees server1.should_exit on its next poll and
+cancels them. Hence the zero gap between servers.
+
 Both servers run inside ONE test on purpose: the autouse reset_shutdown_state
 fixture resets AppStatus.should_exit between tests and would mask the bug.
 """
@@ -25,14 +30,15 @@ from starlette.routing import Route
 
 from sse_starlette.sse import EventSourceResponse
 
-# Watcher polls every 0.5s; two intervals guarantee it has observed server1's exit.
-WATCHER_OBSERVES_EXIT_DELAY = 1.1
+# Longer than the watcher's 0.5s poll interval: a poll always happens while a
+# stream is open, which makes the stale-watcher case deterministic.
+FIRST_EVENT_DELAY = 0.6
 
 
 async def _events(_request):
     async def generator():
-        # First event arrives a moment later, as in a real stream.
-        await anyio.sleep(0.1)
+        # First event arrives later, as in a real stream.
+        await anyio.sleep(FIRST_EVENT_DELAY)
         yield {"data": "hello"}
 
     return EventSourceResponse(generator())
@@ -64,8 +70,17 @@ async def _serve_once_and_fetch_events(app: Starlette) -> str:
 
 class TestIssue211ShouldExitLatch:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "gap_between_servers",
+        [
+            # Watcher that saw server1 is still alive when server2's request arrives.
+            pytest.param(0.0, id="within-watcher-poll-interval"),
+            # Watcher polls every 0.5s; two intervals guarantee it observed server1's exit.
+            pytest.param(1.1, id="after-watcher-observed-exit"),
+        ],
+    )
     async def test_eventSourceResponse_whenEarlierUvicornServerStopped_thenLaterServerStreamsEvents(
-        self,
+        self, gap_between_servers
     ):
         app = Starlette(routes=[Route("/events", _events)])
 
@@ -73,9 +88,10 @@ class TestIssue211ShouldExitLatch:
             first_body = await _serve_once_and_fetch_events(app)
             assert "data: hello" in first_body
 
-            await anyio.sleep(WATCHER_OBSERVES_EXIT_DELAY)
+            await anyio.sleep(gap_between_servers)
 
             # Before the fix: RemoteProtocolError (incomplete chunked read),
-            # because the stopped first server latched AppStatus.should_exit.
+            # because the stopped first server latched AppStatus.should_exit
+            # or a still-running watcher held a reference to it.
             second_body = await _serve_once_and_fetch_events(app)
             assert "data: hello" in second_body

@@ -272,8 +272,18 @@ Layer 1: Signal Capture (process-wide)
 |  Fallback (monkey-patch fails, e.g. uvicorn 0.29+):             |
 |  _get_uvicorn_server() introspects signal.getsignal(SIGTERM)    |
 |  to find uvicorn's Server instance and check .should_exit        |
+|  - re-resolved on every watcher poll (Issue #211)                |
+|  - NEVER copied into AppStatus.should_exit (Issue #211)          |
 |                                                                  |
 +------------------------------------------------------------------+
+
+The fallback is server-scoped on purpose. `AppStatus.should_exit` is
+process-global and never reset, so copying a server's exit into it cancels
+every stream of every later server in the process. Resolving the server only
+once at watcher start has the same effect for a server started within one
+poll interval (0.5s): the old watcher still holds the stopped server. uvicorn
+restores the SIGTERM handler only after `serve()` returns, so re-resolving
+still finds a server that is draining.
 
 Layer 2: Per-Thread Broadcast (thread-local)
 +------------------------------------------------------------------+
