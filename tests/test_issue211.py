@@ -17,7 +17,7 @@ import asyncio
 import socket
 
 import anyio
-import httpx
+import httpx2 as httpx
 import pytest
 import uvicorn
 from starlette.applications import Starlette

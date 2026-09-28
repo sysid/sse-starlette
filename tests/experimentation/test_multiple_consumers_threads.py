@@ -7,7 +7,7 @@ import time
 from functools import partial
 from pathlib import Path
 
-import httpx
+import httpx2 as httpx
 import psutil
 import pytest
 
