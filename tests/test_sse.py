@@ -200,6 +200,73 @@ class TestEventSourceResponse:
 
         assert cleanup_executed, "Cleanup should be executed on timeout"
 
+    @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        "interruption", ["disconnect", "shutdown", "cancel", "send_error", "timeout"]
+    )
+    async def test_send_whenInterrupted_thenClosesSuspendedGenerator(
+        self, interruption, monkeypatch
+    ):
+        send_started = anyio.Event()
+        cleanup = []
+        send_error = OSError("connection closed")
+
+        async def event_publisher():
+            try:
+                yield {"data": "first event"}
+                pytest.fail("The interrupted send must not request another event")
+            finally:
+                # Resource release may itself require asynchronous I/O.
+                await anyio.lowlevel.checkpoint()
+                cleanup.append("closed")
+
+        # Keep a reference so garbage collection cannot hide a missing close.
+        publisher = event_publisher()
+        response = EventSourceResponse(
+            publisher, ping=0, send_timeout=0.01 if interruption == "timeout" else None
+        )
+        outer_scope = anyio.CancelScope()
+
+        async def send(message):
+            if message["type"] == "http.response.body":
+                send_started.set()
+                if interruption == "send_error":
+                    raise send_error
+                await anyio.sleep_forever()
+
+        async def receive():
+            await send_started.wait()
+            if interruption == "disconnect":
+                return {"type": "http.disconnect"}
+            if interruption == "cancel":
+                outer_scope.cancel()
+            await anyio.sleep_forever()
+
+        async def wait_for_exit():
+            await send_started.wait()
+            if interruption != "shutdown":
+                await anyio.sleep_forever()
+
+        monkeypatch.setattr(response, "_listen_for_exit_signal", wait_for_exit)
+        scope = {"type": "http", "method": "GET", "headers": []}
+
+        try:
+            with anyio.fail_after(1), outer_scope:
+                if interruption == "send_error":
+                    with pytest.raises(OSError) as exc_info:
+                        await response(scope, receive, send)
+                    assert exc_info.value is send_error
+                elif interruption == "timeout":
+                    with pytest.raises(SendTimeoutError):
+                        await response(scope, receive, send)
+                else:
+                    await response(scope, receive, send)
+
+            assert cleanup == ["closed"]
+            assert publisher.ag_frame is None
+        finally:
+            await publisher.aclose()
+
     def test_headers_whenCustomHeadersProvided_thenMergesCorrectly(self):
         # Arrange
         custom_headers = {

@@ -35,6 +35,12 @@ async def cancel_on_finish(coro):
 
 This makes the task group a **race**: the first task to complete wins and kills the rest.
 
+If a data send is interrupted after the iterator has yielded, `_stream_response`
+closes the iterator when it supports `aclose()`, then re-raises the interruption.
+The close runs in a shielded cancel scope so asynchronous cleanup can finish even
+when the task group is already cancelled. This differs from cancellation while
+awaiting the next item, which is delivered directly into the iterator.
+
 ---
 
 ## Flow 1: Normal Generator Exhaustion
@@ -79,7 +85,7 @@ _stream_response         _ping        _exit_signal    _disconnect
    CANCEL <----------------+----- CANCEL <-+
       |
       v
-  Task group exits (generator receives CancelledError)
+  Task group exits (iterator cancelled during iteration, or closed during send)
 ```
 
 ---
