@@ -82,6 +82,10 @@ current_version = "3.5.0"
 commit = true
 tag = false
 message = "Bump version to {new_version}"
+# uv.lock records this package's own version: relock and stage it before the
+# bump commit, so the tagged commit is in sync and the next `uv run` leaves
+# the tree clean.
+pre_commit_hooks = ["uv lock", "git add uv.lock"]
 
 [tool.bumpversion.file_patterns]
 "sse_starlette/__init__.py" = [
