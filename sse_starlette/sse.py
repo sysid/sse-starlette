@@ -384,7 +384,12 @@ class EventSourceResponse(Response):
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
                     with anyio.CancelScope(shield=True):
-                        await aclose()
+                        try:
+                            await aclose()
+                        except Exception:
+                            logger.exception(
+                                "Error closing body iterator after interrupted send"
+                            )
                 raise
 
         async with self._send_lock:

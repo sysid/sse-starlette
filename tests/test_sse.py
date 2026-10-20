@@ -204,12 +204,14 @@ class TestEventSourceResponse:
     @pytest.mark.parametrize(
         "interruption", ["disconnect", "shutdown", "cancel", "send_error", "timeout"]
     )
+    @pytest.mark.parametrize("cleanup_fails", [False, True])
     async def test_send_whenInterrupted_thenClosesSuspendedGenerator(
-        self, interruption, monkeypatch
+        self, interruption, cleanup_fails, monkeypatch, caplog
     ):
         send_started = anyio.Event()
         cleanup = []
         send_error = OSError("connection closed")
+        cleanup_error = RuntimeError("generator cleanup failed")
 
         async def event_publisher():
             try:
@@ -219,11 +221,16 @@ class TestEventSourceResponse:
                 # Resource release may itself require asynchronous I/O.
                 await anyio.lowlevel.checkpoint()
                 cleanup.append("closed")
+                if cleanup_fails:
+                    raise cleanup_error
 
         # Keep a reference so garbage collection cannot hide a missing close.
         publisher = event_publisher()
         response = EventSourceResponse(
-            publisher, ping=0, send_timeout=0.01 if interruption == "timeout" else None
+            publisher,
+            ping=0,
+            send_timeout=0.01 if interruption == "timeout" else None,
+            background=BackgroundTask(lambda: cleanup.append("background")),
         )
         outer_scope = anyio.CancelScope()
 
@@ -262,8 +269,22 @@ class TestEventSourceResponse:
                 else:
                     await response(scope, receive, send)
 
-            assert cleanup == ["closed"]
-            assert publisher.ag_frame is None
+            expected = ["closed"]
+            if interruption in ("disconnect", "shutdown"):
+                expected.append("background")
+            assert cleanup == expected
+            if interruption == "cancel":
+                assert outer_scope.cancelled_caught
+
+            errors = [
+                record
+                for record in caplog.records
+                if record.name == "sse_starlette.sse"
+                and record.levelno == logging.ERROR
+            ]
+            assert len(errors) == int(cleanup_fails)
+            if cleanup_fails:
+                assert errors[0].exc_info[1] is cleanup_error
         finally:
             await publisher.aclose()
 

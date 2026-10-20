@@ -40,6 +40,8 @@ closes the iterator when it supports `aclose()`, then re-raises the interruption
 The close runs in a shielded cancel scope so asynchronous cleanup can finish even
 when the task group is already cancelled. This differs from cancellation while
 awaiting the next item, which is delivered directly into the iterator.
+If `aclose()` raises an `Exception`, it is logged and the original send
+interruption is re-raised so cleanup failures do not mask cancellation.
 
 ---
 
