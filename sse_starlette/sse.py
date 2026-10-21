@@ -497,6 +497,20 @@ class EventSourceResponse(Response):
         - _listen_for_exit_signal to respond to server shutdown
         - _listen_for_disconnect to respond to client disconnect
         """
+        if scope["type"] == "http" and scope["method"].upper() == "HEAD":
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": self.status_code,
+                    "headers": self.raw_headers,
+                }
+            )
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
+            self.active = False
+            if self.background is not None:
+                await self.background()
+            return
+
         # WebSocket denial parity with Starlette's StreamingResponse: a
         # streaming response on a websocket scope must wrap send so message
         # types become ``websocket.http.response.*``.
