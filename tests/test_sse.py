@@ -288,6 +288,69 @@ class TestEventSourceResponse:
         finally:
             await publisher.aclose()
 
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("buffer_size", [0, 1, 10])
+    async def test_send_whenClientDisconnectsWithMemoryChannel_thenProducerIsCancelledCleanly(
+        self, buffer_size
+    ):
+        """Closing the receive stream on an interrupted send must not break the producer.
+
+        Since #215 an interrupted send calls ``aclose()`` on the body iterator. For a
+        memory channel that closes the receive stream while the producer may still be
+        blocked in ``send_chan.send()``:
+
+            producer --send()--> [channel, buffer N] --> _stream_response --send()--> client
+                                                                |              (blocks)
+                                                       client disconnects
+                                                                v
+                                        task group cancelled -> shielded recv_chan.aclose()
+                                                                ▼
+                         Question: does the producer exit with CancelledError (fine)
+                                   or BrokenResourceError (ExceptionGroup → regression)?
+
+        The producer must exit with the cancellation exception. If it saw
+        ``BrokenResourceError`` instead, that error would escape the response's task
+        group as an ExceptionGroup and break the documented memory-channel pattern.
+        """
+        producer_exits = []
+        send_chan, recv_chan = anyio.create_memory_object_stream(buffer_size)
+
+        async def producer(chan):
+            try:
+                async with chan:
+                    for i in range(100):
+                        await chan.send({"data": str(i)})
+            except BaseException as exc:
+                producer_exits.append(type(exc))
+                raise
+
+        response = EventSourceResponse(
+            recv_chan, ping=0, data_sender_callable=partial(producer, send_chan)
+        )
+        send_started = anyio.Event()
+
+        async def send(message):
+            # Client stops reading: the first body send never completes.
+            if message["type"] == "http.response.body":
+                send_started.set()
+                await anyio.sleep_forever()
+
+        async def receive():
+            # Disconnect only once the producer is blocked on a full channel.
+            await send_started.wait()
+            while send_chan.statistics().tasks_waiting_send == 0:
+                await anyio.lowlevel.checkpoint()
+            return {"type": "http.disconnect"}
+
+        with anyio.fail_after(1):
+            await response(
+                {"type": "http", "method": "GET", "headers": []}, receive, send
+            )
+
+        assert producer_exits == [anyio.get_cancelled_exc_class()]
+        with pytest.raises(anyio.ClosedResourceError):
+            recv_chan.receive_nowait()
+
     def test_headers_whenCustomHeadersProvided_thenMergesCorrectly(self):
         # Arrange
         custom_headers = {
