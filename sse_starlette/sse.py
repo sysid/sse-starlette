@@ -378,10 +378,18 @@ class EventSourceResponse(Response):
                     send,
                     {"type": "http.response.body", "body": chunk, "more_body": True},
                 )
-            except SendTimeoutError:
+            except BaseException:
+                # The iterator is suspended at yield while send runs. Cancellation
+                # or a send error must close it too, not just a send timeout.
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
-                    await aclose()
+                    with anyio.CancelScope(shield=True):
+                        try:
+                            await aclose()
+                        except Exception:
+                            logger.exception(
+                                "Error closing body iterator after interrupted send"
+                            )
                 raise
 
         async with self._send_lock:
