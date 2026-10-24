@@ -35,13 +35,14 @@ async def cancel_on_finish(coro):
 
 This makes the task group a **race**: the first task to complete wins and kills the rest.
 
-If a data send is interrupted after the iterator has yielded, `_stream_response`
-closes the iterator when it supports `aclose()`, then re-raises the interruption.
+If encoding fails or a data send is interrupted after the iterator has yielded,
+`_stream_response` closes the iterator when it supports `aclose()`, then re-raises
+the original exception.
 The close runs in a shielded cancel scope so asynchronous cleanup can finish even
 when the task group is already cancelled. This differs from cancellation while
 awaiting the next item, which is delivered directly into the iterator.
-If `aclose()` raises an `Exception`, it is logged and the original send
-interruption is re-raised so cleanup failures do not mask cancellation.
+If `aclose()` raises an `Exception`, it is logged and the original encoding or send
+exception is re-raised so cleanup failures do not mask the original failure.
 
 ---
 
