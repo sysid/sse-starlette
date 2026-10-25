@@ -443,10 +443,8 @@ The `experimentation` group is opt-in (kept out of the default `dev` install) to
 contributor footprint small. See `tests/experimentation/` for the tests it enables.
 
 <!-- Badges -->
-[pypi-image]: https://badge.fury.io/py/sse-starlette.svg
+[pypi-image]: https://img.shields.io/pypi/v/sse-starlette.svg
 [pypi-url]: https://pypi.org/project/sse-starlette/
 [build-image]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml/badge.svg
 [build-url]: https://github.com/sysid/sse-starlette/actions/workflows/build.yml
-[coverage-image]: https://codecov.io/gh/sysid/sse-starlette/branch/master/graph/badge.svg
-<!--[coverage-url]: https://codecov.io/gh/sysid/sse-starlette-->
 
