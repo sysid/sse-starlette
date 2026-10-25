@@ -69,7 +69,6 @@ async def _serve_once_and_fetch_events(app: Starlette) -> str:
 
 
 class TestIssue211ShouldExitLatch:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "gap_between_servers",
         [

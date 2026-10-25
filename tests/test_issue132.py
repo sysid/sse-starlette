@@ -24,7 +24,6 @@ import signal
 from unittest.mock import MagicMock, patch
 
 import anyio
-import pytest
 
 from sse_starlette.sse import (
     AppStatus,
@@ -98,7 +97,6 @@ class TestUvicornServerIntrospection:
 class TestShutdownWatcherDualSource:
     """Test _shutdown_watcher() detects shutdown from both sources."""
 
-    @pytest.mark.asyncio
     async def test_detects_appstatus_should_exit(self):
         """Should detect when AppStatus.should_exit is set (monkey-patch worked)."""
         state = _get_shutdown_state()
@@ -119,7 +117,6 @@ class TestShutdownWatcherDualSource:
 
         assert AppStatus.should_exit is True
 
-    @pytest.mark.asyncio
     async def test_detects_uvicorn_server_should_exit(self):
         """Should detect when uvicorn Server.should_exit is set (Issue #132)."""
         # Create a mock uvicorn server
@@ -147,7 +144,6 @@ class TestShutdownWatcherDualSource:
         # Issue #211: server-scoped exit must not latch the process-global flag
         assert AppStatus.should_exit is False
 
-    @pytest.mark.asyncio
     async def test_fallback_when_no_uvicorn_server(self):
         """Should work when _get_uvicorn_server returns None."""
         state = _get_shutdown_state()

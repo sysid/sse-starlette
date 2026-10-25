@@ -144,7 +144,6 @@ class SSEClient:
             raise
 
 
-@pytest.mark.asyncio
 @pytest.mark.experimentation
 @pytest.mark.parametrize(
     "app_path,expected_lines",
