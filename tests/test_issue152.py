@@ -14,7 +14,6 @@ See: thoughts/issue152-watcher-leak-analysis.md
 import asyncio
 
 import anyio
-import pytest
 
 # Watcher polls every 0.5s, so we need >0.5s for it to detect shutdown.
 # Add margin for test system load variance.
@@ -25,7 +24,6 @@ WATCHER_DETECT_TIMEOUT = WATCHER_POLL_INTERVAL + 0.2  # 0.7s
 class TestIssue152WatcherLeak:
     """Regression tests for Issue #152: only one watcher per thread."""
 
-    @pytest.mark.asyncio
     async def test_single_watcher_per_thread(self):
         """
         Issue #152 regression: Only one watcher should be started per thread.
@@ -68,7 +66,6 @@ class TestIssue152WatcherLeak:
         finally:
             sse_module._shutdown_watcher = original_watcher
 
-    @pytest.mark.asyncio
     async def test_watcher_broadcasts_to_all_events(self):
         """Verify that one watcher can signal multiple events.
 
@@ -103,7 +100,6 @@ class TestIssue152WatcherLeak:
             for event in events:
                 state.events.discard(event)
 
-    @pytest.mark.asyncio
     async def test_rapid_ensure_calls_spawn_single_watcher(self):
         """Multiple rapid calls to _ensure_watcher_started don't spawn multiple watchers."""
         import sse_starlette.sse as sse_module
@@ -130,7 +126,6 @@ class TestIssue152WatcherLeak:
         finally:
             sse_module._shutdown_watcher = original_watcher
 
-    @pytest.mark.asyncio
     async def test_event_removal_during_broadcast_is_safe(self):
         """Removing an event from the set during broadcast doesn't crash.
 
@@ -160,7 +155,6 @@ class TestIssue152WatcherLeak:
         assert events[0].is_set(), "Event 0 should be set"
         assert events[2].is_set(), "Event 2 should be set"
 
-    @pytest.mark.asyncio
     async def test_watcher_cleanup_allows_restart(self):
         """After watcher exits, a new connection can start a new watcher.
 

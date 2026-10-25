@@ -12,7 +12,6 @@ import pytest
 from sse_starlette import EventSourceResponse
 
 
-@pytest.mark.asyncio
 async def test_call_when_generatorRaises_then_bareExceptionPropagates():
     """A user-generator exception must not surface as an ExceptionGroup.
 
@@ -44,7 +43,6 @@ async def test_call_when_generatorRaises_then_bareExceptionPropagates():
         await response(scope, receive, send)
 
 
-@pytest.mark.asyncio
 async def test_call_whenWebsocketScope_thenSendIsWrappedForDenial():
     """Streaming responses must be usable as WebSocket denial responses.
 

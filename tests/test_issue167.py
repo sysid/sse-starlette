@@ -23,7 +23,6 @@ WATCHER_DETECT_TIMEOUT = WATCHER_POLL_INTERVAL + 0.3
 class TestIssue167ShutdownEvent:
     """Tests for cooperative shutdown via shutdown_event parameter."""
 
-    @pytest.mark.asyncio
     async def test_shutdownEvent_whenShutdownDetected_thenEventIsSet(self):
         """The library must set the user's shutdown_event when server shutdown is detected."""
         shutdown_event = anyio.Event()
@@ -69,7 +68,6 @@ class TestIssue167ShutdownEvent:
             )
             tg.cancel_scope.cancel()
 
-    @pytest.mark.asyncio
     async def test_shutdownGracePeriod_whenGeneratorExitsInTime_thenCleanShutdown(self):
         """Generator that sees shutdown_event and exits within grace period
         should complete without CancelledError."""
@@ -138,7 +136,6 @@ class TestIssue167ShutdownEvent:
         assert b"event: shutdown" in combined, "Farewell event must reach the client"
         assert b"data: bye" in combined
 
-    @pytest.mark.asyncio
     async def test_shutdownGracePeriod_whenGeneratorIgnoresEvent_thenForceCancelAfterTimeout(
         self,
     ):
@@ -198,7 +195,6 @@ class TestIssue167ShutdownEvent:
         assert shutdown_event.is_set(), "Event must be set even if generator ignores it"
         assert was_cancelled, "Generator must be force-cancelled after grace period"
 
-    @pytest.mark.asyncio
     async def test_noShutdownEvent_whenShutdownDetected_thenImmediateCancel(self):
         """Without shutdown_event, behavior is identical to pre-#167: immediate cancel."""
         was_cancelled = False
@@ -246,7 +242,6 @@ class TestIssue167ShutdownEvent:
             "Generator must be cancelled immediately (no grace period)"
         )
 
-    @pytest.mark.asyncio
     async def test_shutdownEvent_whenGracePeriodZero_thenEventSetButImmediateCancel(
         self,
     ):

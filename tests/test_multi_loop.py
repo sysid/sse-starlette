@@ -97,7 +97,6 @@ class TestIssue149HandleExitSignaling:
     broadcasts to all registered events in the same thread.
     """
 
-    @pytest.mark.asyncio
     async def test_handle_exit_wakes_waiting_task(self):
         """
         Test that handle_exit() wakes a task waiting on _listen_for_exit_signal.
@@ -132,7 +131,6 @@ class TestIssue149HandleExitSignaling:
                 pass
             pytest.fail("handle_exit() failed to wake waiting task within timeout.")
 
-    @pytest.mark.asyncio
     async def test_handle_exit_wakes_multiple_waiting_tasks(self):
         """Test that handle_exit() wakes ALL waiting tasks."""
         num_tasks = 3
@@ -166,7 +164,6 @@ class TestIssue149HandleExitSignaling:
             f"Only {len(exited)}/{num_tasks} tasks woke up."
         )
 
-    @pytest.mark.asyncio
     async def test_manual_shutdown_ignores_signal(self):
         """Test that manually setting should_exit wakes waiting tasks."""
         task_exited = asyncio.Event()
@@ -196,7 +193,6 @@ class TestIssue149HandleExitSignaling:
             AppStatus.enable_automatic_graceful_drain = original_drain
             AppStatus.original_handler = original_handler
 
-    @pytest.mark.asyncio
     async def test_all_tasks_share_same_shutdown_state(self):
         """
         Verify that all tasks created with asyncio.create_task() in the same thread
@@ -223,7 +219,6 @@ class TestIssue149HandleExitSignaling:
 class TestUvicornIntrospection:
     """Tests for uvicorn server introspection bypass when auto-drain is disabled."""
 
-    @pytest.mark.asyncio
     async def test_uvicorn_should_exit_ignored_when_disabled(self):
         """
         Test that uvicorn's should_exit flag is ignored when automatic draining
