@@ -26,10 +26,9 @@ def collapse_excgroups() -> Generator[None, None, None]:
         yield
     except BaseException as exc:
         if has_exceptiongroups:
-            # `ty` does not narrow BaseExceptionGroup.exceptions; the runtime
-            # contract is identical to starlette._utils.collapse_excgroups.
-            while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:  # ty: ignore[unresolved-attribute]
-                exc = exc.exceptions[0]  # ty: ignore[unresolved-attribute]
+            # Runtime contract is identical to starlette._utils.collapse_excgroups.
+            while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:
+                exc = exc.exceptions[0]
 
         raise exc
 
