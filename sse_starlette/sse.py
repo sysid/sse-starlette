@@ -224,7 +224,7 @@ try:
     from uvicorn.main import Server
 
     AppStatus.original_handler = Server.handle_exit
-    Server.handle_exit = AppStatus.handle_exit  # type: ignore
+    Server.handle_exit = AppStatus.handle_exit
 except ImportError:
     logger.debug(
         "Uvicorn not installed. Graceful shutdown on server termination disabled."
