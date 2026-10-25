@@ -511,6 +511,31 @@ class EventSourceResponse(Response):
         if scope["type"] == "websocket":
             send = _wrap_websocket_denial_send(send)
 
+        # HEAD must not open a stream (Issue #218).
+        #
+        # Starlette adds HEAD to every GET route, so an SSE endpoint also
+        # answers HEAD. Streaming on HEAD never completes: the ASGI server
+        # discards the body bytes but still waits for ``more_body=False``,
+        # which the stream only sends once the generator ends. The response
+        # therefore hangs for the client, and the handler, its session and
+        # its socket leak.
+        #
+        # Starlette's FileResponse answers HEAD the same way -- headers and
+        # an empty body -- and both Response and FileResponse still run the
+        # background task, so this follows the same contract.
+        if scope["type"] == "http" and scope["method"].upper() == "HEAD":
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": self.status_code,
+                    "headers": self.raw_headers,
+                }
+            )
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
+            if self.background is not None:
+                await self.background()
+            return
+
         # collapse_excgroups parity with Starlette's StreamingResponse: anyio
         # v4 wraps task-group failures in ExceptionGroup; user middleware
         # expects the bare exception.
