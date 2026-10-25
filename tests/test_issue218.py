@@ -30,6 +30,7 @@ from starlette.background import BackgroundTask
 from starlette.routing import Route
 
 from sse_starlette import EventSourceResponse
+from sse_starlette.sse import SendTimeoutError
 
 # A regression would hang here, so fail fast instead of blocking the suite.
 TIMEOUT = 5
@@ -52,7 +53,6 @@ def _http_scope(method: str) -> dict:
     }
 
 
-@pytest.mark.asyncio
 async def test_head_whenCalled_thenResponseCompletesWithoutStreaming():
     """A HEAD request must complete instead of streaming forever."""
     started = False
@@ -64,7 +64,7 @@ async def test_head_whenCalled_thenResponseCompletesWithoutStreaming():
             yield {"data": "never"}
             await anyio.sleep(0.01)
 
-    response = EventSourceResponse(generator(), ping=0.05)
+    response = EventSourceResponse(generator())
 
     sent: list[dict] = []
 
@@ -87,14 +87,98 @@ async def test_head_whenCalled_thenResponseCompletesWithoutStreaming():
     assert started is False, "HEAD must not start the event stream"
 
 
-@pytest.mark.asyncio
+async def test_head_whenMethodIsLowercase_thenResponseCompletesWithoutStreaming():
+    """ASGI servers send uppercase methods, but a lowercase one must not stream."""
+    started = False
+
+    async def generator():
+        nonlocal started
+        started = True
+        while True:
+            yield {"data": "never"}
+            await anyio.sleep(0.01)
+
+    response = EventSourceResponse(generator())
+
+    sent: list[dict] = []
+
+    async def send(message):
+        sent.append(message)
+
+    async def receive():  # pragma: no cover - never awaited, the stream must not start
+        await anyio.sleep_forever()
+
+    with anyio.fail_after(TIMEOUT):
+        await response(_http_scope("head"), receive, send)
+
+    assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+    assert sent[-1]["more_body"] is False
+    assert started is False, "HEAD must not start the event stream"
+
+
+async def test_head_whenContentIsSyncIterator_thenIteratorIsNotConsumed():
+    """Sync content is wrapped in a threadpool iterator; HEAD must not pull from it."""
+    pulled = False
+
+    def generator():
+        nonlocal pulled
+        pulled = True
+        while True:
+            yield {"data": "never"}
+
+    response = EventSourceResponse(generator())
+
+    sent: list[dict] = []
+
+    async def send(message):
+        sent.append(message)
+
+    async def receive():  # pragma: no cover - never awaited, the stream must not start
+        await anyio.sleep_forever()
+
+    with anyio.fail_after(TIMEOUT):
+        await response(_http_scope("HEAD"), receive, send)
+
+    assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+    assert sent[-1]["more_body"] is False
+    assert pulled is False, "HEAD must not consume the sync iterator"
+
+
+async def test_head_whenDataSenderCallableIsSet_thenItIsNotStarted():
+    """data_sender_callable feeds the stream, so HEAD must not start it."""
+    started = False
+
+    async def data_sender():
+        nonlocal started
+        started = True
+
+    async def generator():  # pragma: no cover - never iterated on HEAD
+        yield {"data": "never"}
+
+    response = EventSourceResponse(generator(), data_sender_callable=data_sender)
+
+    sent: list[dict] = []
+
+    async def send(message):
+        sent.append(message)
+
+    async def receive():  # pragma: no cover - never awaited, the stream must not start
+        await anyio.sleep_forever()
+
+    with anyio.fail_after(TIMEOUT):
+        await response(_http_scope("HEAD"), receive, send)
+
+    assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+    assert started is False, "HEAD must not start data_sender_callable"
+
+
 async def test_head_whenCalled_thenHeadersMatchTheStreamedResponse():
     """HEAD must return the headers a GET would return."""
 
     async def generator():
         yield {"data": "hello"}
 
-    response = EventSourceResponse(generator(), ping=0.05)
+    response = EventSourceResponse(generator())
 
     sent: list[dict] = []
 
@@ -115,29 +199,26 @@ async def test_head_whenCalled_thenHeadersMatchTheStreamedResponse():
     assert headers["cache-control"] == "no-store"
 
 
-@pytest.mark.asyncio
-async def test_head_whenBackgroundTaskIsSet_thenBackgroundTaskRuns():
-    """The background task must still run, as it does for Starlette's responses.
+async def test_head_whenBackgroundTaskIsSet_thenBackgroundTaskRunsAfterFinalFrame():
+    """The background task must still run, as it does for Starlette's responses,
+    and only after the response is complete.
 
     The generator never ends, so on the unfixed code the response never
     completes and the background task never runs.
     """
-    ran = False
+    sent: list[dict] = []
+    last_message_seen_by_background: dict | None = None
 
     async def on_complete():
-        nonlocal ran
-        ran = True
+        nonlocal last_message_seen_by_background
+        last_message_seen_by_background = sent[-1]
 
     async def generator():
         while True:
             yield {"data": "never"}
             await anyio.sleep(0.01)
 
-    response = EventSourceResponse(
-        generator(), ping=0.05, background=BackgroundTask(on_complete)
-    )
-
-    sent: list[dict] = []
+    response = EventSourceResponse(generator(), background=BackgroundTask(on_complete))
 
     async def send(message):
         sent.append(message)
@@ -148,10 +229,72 @@ async def test_head_whenBackgroundTaskIsSet_thenBackgroundTaskRuns():
     with anyio.fail_after(TIMEOUT):
         await response(_http_scope("HEAD"), receive, send)
 
-    assert ran is True, "the background task must run for HEAD as well"
+    assert last_message_seen_by_background == {
+        "type": "http.response.body",
+        "body": b"",
+        "more_body": False,
+    }, "the background task must run after the final frame"
 
 
-@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failing_message_type", ["http.response.start", "http.response.body"]
+)
+async def test_head_whenSendFails_thenErrorPropagatesWithoutBackgroundTask(
+    failing_message_type,
+):
+    """A failed send must surface, and the background task must not run,
+    matching the GET path where a task-group error skips the background task.
+    """
+    background_ran = False
+
+    async def on_complete():
+        nonlocal background_ran
+        background_ran = True
+
+    async def generator():  # pragma: no cover - never iterated on HEAD
+        yield {"data": "never"}
+
+    response = EventSourceResponse(generator(), background=BackgroundTask(on_complete))
+
+    async def send(message):
+        if message["type"] == failing_message_type:
+            raise RuntimeError("send failed")
+
+    async def receive():  # pragma: no cover
+        await anyio.sleep_forever()
+
+    with anyio.fail_after(TIMEOUT):
+        with pytest.raises(RuntimeError, match="send failed"):
+            await response(_http_scope("HEAD"), receive, send)
+
+    assert background_ran is False
+
+
+@pytest.mark.parametrize(
+    "stalling_message_type", ["http.response.start", "http.response.body"]
+)
+async def test_head_whenSendStallsBeyondSendTimeout_thenRaisesSendTimeoutError(
+    stalling_message_type,
+):
+    """send_timeout applies to HEAD as it does to the streamed response."""
+
+    async def generator():  # pragma: no cover - never iterated on HEAD
+        yield {"data": "never"}
+
+    response = EventSourceResponse(generator(), send_timeout=0.1)
+
+    async def send(message):
+        if message["type"] == stalling_message_type:
+            await anyio.sleep_forever()
+
+    async def receive():  # pragma: no cover
+        await anyio.sleep_forever()
+
+    with anyio.fail_after(TIMEOUT):
+        with pytest.raises(SendTimeoutError):
+            await response(_http_scope("HEAD"), receive, send)
+
+
 async def test_get_whenCalled_thenStreamIsUnaffected():
     """The HEAD short-circuit must not change GET behaviour."""
 
@@ -179,7 +322,6 @@ async def test_get_whenCalled_thenStreamIsUnaffected():
     assert b"data: two" in body
 
 
-@pytest.mark.asyncio
 async def test_head_overHttp_whenRequested_thenTheResponseCompletes():
     """End to end through Starlette: a HEAD must not hang the request."""
 
@@ -191,7 +333,7 @@ async def test_head_overHttp_whenRequested_thenTheResponseCompletes():
                 yield {"data": str(i)}
                 await anyio.sleep(0.01)
 
-        return EventSourceResponse(generator(), ping=0.05)
+        return EventSourceResponse(generator())
 
     app = Starlette(routes=[Route("/events", events)])
 
