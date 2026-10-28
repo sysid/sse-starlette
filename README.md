@@ -266,6 +266,7 @@ cancellation on server shutdown.
 | `ping_message_factory` | `Callable` | `None` | Custom ping message creator |
 | `shutdown_event` | `anyio.Event` | `None` | Event set by library on server shutdown |
 | `shutdown_grace_period` | `float` | `0` | Seconds to wait after setting `shutdown_event` before force-cancel |
+| `cleanup_timeout` | `float` | `None` | Seconds to wait for the generator's cleanup after an interrupted send (`None` = no limit) |
 
 ### Client Disconnection
 

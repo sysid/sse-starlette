@@ -289,6 +289,61 @@ class TestEventSourceResponse:
             await publisher.aclose()
 
     @pytest.mark.anyio
+    async def test_send_whenCleanupHangs_thenCleanupTimeoutBoundsIt(self, caplog):
+        send_started = anyio.Event()
+        cleanup = []
+
+        async def event_publisher():
+            try:
+                yield {"data": "first event"}
+            finally:
+                try:
+                    await anyio.sleep_forever()
+                except anyio.get_cancelled_exc_class():
+                    cleanup.append("cancelled")
+                    raise
+
+        # Keep a reference so garbage collection cannot hide a missing close.
+        publisher = event_publisher()
+        response = EventSourceResponse(
+            publisher,
+            ping=0,
+            cleanup_timeout=0.05,
+            background=BackgroundTask(lambda: cleanup.append("background")),
+        )
+
+        async def send(message):
+            if message["type"] == "http.response.body":
+                send_started.set()
+                await anyio.sleep_forever()
+
+        async def receive():
+            await send_started.wait()
+            return {"type": "http.disconnect"}
+
+        scope = {"type": "http", "method": "GET", "headers": []}
+
+        try:
+            with anyio.fail_after(1):
+                await response(scope, receive, send)
+
+            assert cleanup == ["cancelled", "background"]
+            warnings = [
+                record
+                for record in caplog.records
+                if record.name == "sse_starlette.sse"
+                and record.levelno == logging.WARNING
+            ]
+            assert len(warnings) == 1
+            assert "timed out" in warnings[0].getMessage()
+        finally:
+            await publisher.aclose()
+
+    def test_cleanupTimeout_whenNegative_thenRaisesValueError(self):
+        with pytest.raises(ValueError, match=r"cleanup_timeout must be >= 0"):
+            EventSourceResponse(0, cleanup_timeout=-1)
+
+    @pytest.mark.anyio
     @pytest.mark.parametrize("buffer_size", [0, 1, 10])
     async def test_send_whenClientDisconnectsWithMemoryChannel_thenProducerIsCancelledCleanly(
         self, buffer_size
