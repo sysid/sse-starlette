@@ -42,6 +42,10 @@ when the task group is already cancelled. This differs from cancellation while
 awaiting the next item, which is delivered directly into the iterator.
 If `aclose()` raises an `Exception`, it is logged and the original send
 interruption is re-raised so cleanup failures do not mask cancellation.
+By default the shielded close has no deadline, so a generator whose cleanup
+never finishes keeps the response open. `cleanup_timeout` bounds it: on expiry
+the cleanup is cancelled, a warning is logged, and the original interruption is
+re-raised (#217).
 
 ---
 

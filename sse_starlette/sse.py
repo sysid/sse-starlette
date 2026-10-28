@@ -266,6 +266,9 @@ class EventSourceResponse(Response):
             before force-cancelling the generator. Must be >= 0. Should be less
             than your ASGI server's graceful shutdown timeout. Default: 0
             (immediate cancel, identical to pre-v3.3.0 behavior).
+        cleanup_timeout: Seconds to wait for the body iterator's ``aclose()``
+            after an interrupted send. On timeout a warning is logged and the
+            response finishes. Must be >= 0. Default: None (no limit).
     """
 
     DEFAULT_PING_INTERVAL = 15
@@ -290,6 +293,7 @@ class EventSourceResponse(Response):
         ] = None,
         shutdown_event: Optional[anyio.Event] = None,
         shutdown_grace_period: float = 0,
+        cleanup_timeout: Optional[float] = None,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -339,6 +343,12 @@ class EventSourceResponse(Response):
             raise ValueError("shutdown_grace_period must be >= 0")
         self._shutdown_event = shutdown_event
         self._shutdown_grace_period = shutdown_grace_period
+
+        # Issue #217: bound the shielded aclose() after an interrupted send so a
+        # stuck generator finally cannot block the response. None = no limit.
+        if cleanup_timeout is not None and cleanup_timeout < 0:
+            raise ValueError("cleanup_timeout must be >= 0")
+        self.cleanup_timeout = cleanup_timeout
 
         self.active = True
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
@@ -390,13 +400,20 @@ class EventSourceResponse(Response):
                 # or a send error must close it too, not just a send timeout.
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
-                    with anyio.CancelScope(shield=True):
+                    with anyio.move_on_after(
+                        self.cleanup_timeout, shield=True
+                    ) as cleanup_scope:
                         try:
                             await aclose()
                         except Exception:
                             logger.exception(
                                 "Error closing body iterator after interrupted send"
                             )
+                    if cleanup_scope.cancelled_caught:
+                        logger.warning(
+                            "Closing body iterator timed out after %s seconds",
+                            self.cleanup_timeout,
+                        )
                 raise
 
         async with self._send_lock:
