@@ -21,7 +21,7 @@ uv add sse-starlette[examples]
 uv add sse-starlette[examples,examples-db]
 
 # Recommended ASGI server
-uv add sse-starlette[uvicorn,granian,daphne]
+uv add "sse-starlette[uvicorn,granian,daphne]"
 ```
 
 ## Quick Start
