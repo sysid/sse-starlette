@@ -379,16 +379,34 @@ If you are using Postman, please see: https://github.com/sysid/sse-starlette/iss
 
 ### Performance Optimization
 
+Hold the permit for the complete ASGI response, not just while constructing
+`EventSourceResponse`. The stream starts after the endpoint returns.
+
 ```python
 # Connection limits
+class LimitedEventSourceResponse(EventSourceResponse):
+    def __init__(self, content, semaphore, **kwargs):
+        super().__init__(content, **kwargs)
+        self.semaphore = semaphore
+
+    async def __call__(self, scope, receive, send):
+        async with self.semaphore:
+            await super().__call__(scope, receive, send)
+
+
 class ConnectionLimiter:
     def __init__(self, max_connections=100):
         self.semaphore = asyncio.Semaphore(max_connections)
-    
+
     async def limited_endpoint(self, request):
-        async with self.semaphore:
-            return EventSourceResponse(generate_events())
+        return LimitedEventSourceResponse(generate_events(), self.semaphore)
 ```
+
+Reuse one limiter across the routes that share the limit. The permit is released
+as the response call exits, including disconnect/error paths. It also covers any
+background task that runs. This bounds active responses within one worker/event
+loop, not queued requests or total TCP connections; use server/proxy admission
+limits if those must also be bounded.
 
 ## Network-Level Gotchas
 
