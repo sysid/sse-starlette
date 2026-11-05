@@ -351,6 +351,50 @@ class TestEventSourceResponse:
         with pytest.raises(anyio.ClosedResourceError):
             recv_chan.receive_nowait()
 
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("buffer_size", [0, 1, 10])
+    @pytest.mark.parametrize("send_first", [False, True])
+    async def test_disconnect_whenWaitingForChannel_thenClosesReceiveStream(
+        self, buffer_size, send_first
+    ):
+        send_chan, recv_chan = anyio.create_memory_object_stream(buffer_size)
+        sent = []
+
+        async def producer():
+            if send_first:
+                await send_chan.send({"data": "first"})
+            await anyio.sleep_forever()
+
+        async def send(message):
+            if message["type"] == "http.response.body":
+                sent.append(message["body"])
+
+        async def receive():
+            # Disconnect while __anext__ is waiting for the next event, rather
+            # than while an already-yielded event is being sent (#215).
+            while recv_chan.statistics().tasks_waiting_receive == 0 or (
+                send_first and not sent
+            ):
+                await anyio.lowlevel.checkpoint()
+            return {"type": "http.disconnect"}
+
+        response = EventSourceResponse(recv_chan, ping=0, data_sender_callable=producer)
+        try:
+            with anyio.fail_after(1):
+                await response(
+                    {"type": "http", "method": "GET", "headers": []}, receive, send
+                )
+
+            assert sent == ([b"data: first\r\n\r\n"] if send_first else [])
+            assert recv_chan.statistics().open_receive_streams == 0
+            # An external producer must learn that its consumer has gone,
+            # instead of blocking forever or filling an abandoned buffer.
+            with pytest.raises(anyio.BrokenResourceError):
+                send_chan.send_nowait({"data": "after disconnect"})
+        finally:
+            await recv_chan.aclose()
+            await send_chan.aclose()
+
     def test_headers_whenCustomHeadersProvided_thenMergesCorrectly(self):
         # Arrange
         custom_headers = {

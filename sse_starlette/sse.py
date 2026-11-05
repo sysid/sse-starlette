@@ -367,6 +367,15 @@ class EventSourceResponse(Response):
         if cancel_scope and cancel_scope.cancel_called:
             raise SendTimeoutError()
 
+    async def _close_body_iterator(self) -> None:
+        aclose = getattr(self.body_iterator, "aclose", None)
+        if aclose is not None:
+            with anyio.CancelScope(shield=True):
+                try:
+                    await aclose()
+                except Exception:
+                    logger.exception("Error closing body iterator after interruption")
+
     async def _stream_response(self, send: Send) -> None:
         """Send out SSE data to the client as it becomes available in the iterator."""
         await send(
@@ -377,7 +386,19 @@ class EventSourceResponse(Response):
             }
         )
 
-        async for data in self.body_iterator:
+        iterator = self.body_iterator.__aiter__()
+        while True:
+            try:
+                data = await iterator.__anext__()
+            except StopAsyncIteration:
+                break
+            except BaseException:
+                # Cancellation reaches an async generator's body, but does not
+                # close other iterators such as AnyIO memory receive streams.
+                # __anext__ has exited here, so aclose() cannot race with it.
+                await self._close_body_iterator()
+                raise
+
             chunk = ensure_bytes(data, self.sep)
             logger.debug("chunk: %s", chunk)
             try:
@@ -388,15 +409,7 @@ class EventSourceResponse(Response):
             except BaseException:
                 # The iterator is suspended at yield while send runs. Cancellation
                 # or a send error must close it too, not just a send timeout.
-                aclose = getattr(self.body_iterator, "aclose", None)
-                if aclose is not None:
-                    with anyio.CancelScope(shield=True):
-                        try:
-                            await aclose()
-                        except Exception:
-                            logger.exception(
-                                "Error closing body iterator after interrupted send"
-                            )
+                await self._close_body_iterator()
                 raise
 
         async with self._send_lock:

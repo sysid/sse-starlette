@@ -38,9 +38,12 @@ This makes the task group a **race**: the first task to complete wins and kills 
 If a data send is interrupted after the iterator has yielded, `_stream_response`
 closes the iterator when it supports `aclose()`, then re-raises the interruption.
 The close runs in a shielded cancel scope so asynchronous cleanup can finish even
-when the task group is already cancelled. This differs from cancellation while
-awaiting the next item, which is delivered directly into the iterator.
-If `aclose()` raises an `Exception`, it is logged and the original send
+when the task group is already cancelled. Cancellation while awaiting the next
+item is delivered directly into the iterator, but does not necessarily close it:
+AnyIO memory receive streams stay open after a cancelled receive. The response
+also closes the body iterator after an interrupted `__anext__()` so external
+producers can detect that their consumer has disconnected.
+If `aclose()` raises an `Exception`, it is logged and the original
 interruption is re-raised so cleanup failures do not mask cancellation.
 
 ---
