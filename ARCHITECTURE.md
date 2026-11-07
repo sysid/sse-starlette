@@ -44,6 +44,13 @@ awaiting the next item, which is delivered directly into the iterator.
 If `aclose()` raises an `Exception`, it is logged and the original encoding or send
 exception is re-raised so cleanup failures do not mask the original failure.
 
+Nothing outside a shield can cancel it, so the close has its own deadline,
+`cleanup_timeout` (#217). On expiry the cleanup is cancelled, a warning is logged and
+the original exception is re-raised. The deadline only reaches cleanup that can be
+cancelled: a nested shield or a blocking call in the generator's `finally` can still
+hang. The closing `more_body=False` frame needs no deadline because it is not
+shielded, so a disconnect or shutdown can already cancel a stalled send.
+
 ---
 
 ## Flow 1: Normal Generator Exhaustion

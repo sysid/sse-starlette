@@ -266,10 +266,17 @@ class EventSourceResponse(Response):
             before force-cancelling the generator. Must be >= 0. Should be less
             than your ASGI server's graceful shutdown timeout. Default: 0
             (immediate cancel, identical to pre-v3.3.0 behavior).
+        cleanup_timeout: Seconds to wait for the body iterator's ``aclose()`` after
+            an encoding failure or an interrupted send. On expiry the cleanup is
+            cancelled, a warning is logged and the original interruption continues.
+            Must be >= 0; ``None`` means no limit. Only cleanup that can be cancelled
+            is bounded: a nested shield or a blocking call can still hang.
+            Default: ``DEFAULT_CLEANUP_TIMEOUT``.
     """
 
     DEFAULT_PING_INTERVAL = 15
     DEFAULT_SEPARATOR = "\r\n"
+    DEFAULT_CLEANUP_TIMEOUT = 30.0
 
     def __init__(
         self,
@@ -290,6 +297,7 @@ class EventSourceResponse(Response):
         ] = None,
         shutdown_event: Optional[anyio.Event] = None,
         shutdown_grace_period: float = 0,
+        cleanup_timeout: Optional[float] = DEFAULT_CLEANUP_TIMEOUT,
     ) -> None:
         # Validate separator
         if sep not in (None, "\r\n", "\r", "\n"):
@@ -339,6 +347,12 @@ class EventSourceResponse(Response):
             raise ValueError("shutdown_grace_period must be >= 0")
         self._shutdown_event = shutdown_event
         self._shutdown_grace_period = shutdown_grace_period
+
+        # Issue #217: nothing outside a shield can cancel it, so the shielded
+        # aclose() in _stream_response needs its own deadline.
+        if cleanup_timeout is not None and cleanup_timeout < 0:
+            raise ValueError("cleanup_timeout must be >= 0")
+        self._cleanup_timeout = cleanup_timeout
 
         self.active = True
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
@@ -390,13 +404,22 @@ class EventSourceResponse(Response):
                 # Close it on failure so its cleanup runs before the error escapes.
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
-                    with anyio.CancelScope(shield=True):
+                    with anyio.move_on_after(
+                        self._cleanup_timeout, shield=True
+                    ) as cleanup_scope:
                         try:
                             await aclose()
                         except Exception:
                             logger.exception(
                                 "Error closing body iterator after encoding or send failure"
                             )
+                    # cancel_called, not cancelled_caught: a generator that swallows
+                    # the cancellation has still had its cleanup cut short.
+                    if cleanup_scope.cancel_called:
+                        logger.warning(
+                            "Body iterator cleanup cancelled after %s seconds",
+                            self._cleanup_timeout,
+                        )
                 raise
 
         async with self._send_lock:

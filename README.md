@@ -266,6 +266,7 @@ cancellation on server shutdown.
 | `ping_message_factory` | `Callable` | `None` | Custom ping message creator |
 | `shutdown_event` | `anyio.Event` | `None` | Event set by library on server shutdown |
 | `shutdown_grace_period` | `float` | `0` | Seconds to wait after setting `shutdown_event` before force-cancel |
+| `cleanup_timeout` | `float` | `30.0` | Seconds to wait for the generator's cleanup after an encoding failure or interrupted send, then cancel it and log a warning (`None` = no limit). Cannot stop a nested shield or a blocking call |
 
 ### Client Disconnection
 
