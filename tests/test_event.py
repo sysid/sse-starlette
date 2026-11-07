@@ -86,6 +86,14 @@ def test_ensure_bytes(input, expected):
     assert ensure_bytes(input, sep="\n") == expected
 
 
+@pytest.mark.parametrize("event", [{"data": "foo"}, {"data": "foo", "sep": "\r\n"}])
+def test_ensure_bytes_whenDict_thenPreservesInput(event):
+    original = event.copy()
+
+    assert ensure_bytes(event, sep="\n") == b"data: foo\n\n"
+    assert event == original
+
+
 @pytest.mark.parametrize(
     "stream_sep,line_sep",
     [

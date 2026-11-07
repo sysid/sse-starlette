@@ -91,6 +91,6 @@ def ensure_bytes(data: Union[bytes, dict, ServerSentEvent, Any], sep: str) -> by
     if isinstance(data, ServerSentEvent):
         return data.encode()
     if isinstance(data, dict):
-        data["sep"] = sep
+        data = {**data, "sep": sep}
         return ServerSentEvent(**data).encode()
     return ServerSentEvent(str(data), sep=sep).encode()
