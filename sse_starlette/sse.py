@@ -378,16 +378,16 @@ class EventSourceResponse(Response):
         )
 
         async for data in self.body_iterator:
-            chunk = ensure_bytes(data, self.sep)
-            logger.debug("chunk: %s", chunk)
             try:
+                chunk = ensure_bytes(data, self.sep)
+                logger.debug("chunk: %s", chunk)
                 await self._send_with_timeout(
                     send,
                     {"type": "http.response.body", "body": chunk, "more_body": True},
                 )
             except BaseException:
-                # The iterator is suspended at yield while send runs. Cancellation
-                # or a send error must close it too, not just a send timeout.
+                # The iterator is suspended at yield during encoding and sending.
+                # Close it on failure so its cleanup runs before the error escapes.
                 aclose = getattr(self.body_iterator, "aclose", None)
                 if aclose is not None:
                     with anyio.CancelScope(shield=True):
@@ -395,7 +395,7 @@ class EventSourceResponse(Response):
                             await aclose()
                         except Exception:
                             logger.exception(
-                                "Error closing body iterator after interrupted send"
+                                "Error closing body iterator after encoding or send failure"
                             )
                 raise
 

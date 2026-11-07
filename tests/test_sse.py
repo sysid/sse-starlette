@@ -289,6 +289,88 @@ class TestEventSourceResponse:
             await publisher.aclose()
 
     @pytest.mark.anyio
+    @pytest.mark.parametrize("encoding_error", ["unknown_field", "retry", "string"])
+    @pytest.mark.parametrize("cleanup_fails", [False, True])
+    async def test_stream_whenEncodingFails_thenClosesSuspendedGenerator(
+        self, encoding_error, cleanup_fails, caplog
+    ):
+        cleanup = []
+        sent = []
+        string_error = ValueError("cannot stringify event")
+        cleanup_error = RuntimeError("generator cleanup failed")
+
+        class BadString:
+            def __str__(self):
+                raise string_error
+
+        invalid_data, error_type, error_message = {
+            "unknown_field": ({"bogus_field": 1}, TypeError, "bogus_field"),
+            "retry": ({"retry": "invalid"}, TypeError, "retry argument must be int"),
+            "string": (BadString(), ValueError, "cannot stringify event"),
+        }[encoding_error]
+
+        async def event_publisher():
+            try:
+                yield {"data": "first event"}
+                yield invalid_data
+                pytest.fail("Encoding failure must not request another event")
+            finally:
+                await anyio.lowlevel.checkpoint()
+                cleanup.append("closed")
+                if cleanup_fails:
+                    raise cleanup_error
+
+        # Keep a reference so garbage collection cannot hide a missing close.
+        publisher = event_publisher()
+        response = EventSourceResponse(
+            publisher,
+            ping=0,
+            background=BackgroundTask(lambda: cleanup.append("background")),
+        )
+
+        async def send(message):
+            sent.append(message)
+
+        async def receive():
+            await anyio.sleep_forever()
+
+        try:
+            with anyio.fail_after(1):
+                with pytest.raises(error_type, match=error_message) as exc_info:
+                    await response(
+                        {"type": "http", "method": "GET", "headers": []}, receive, send
+                    )
+
+            if encoding_error == "string":
+                assert exc_info.value is string_error
+            assert cleanup == ["closed"]
+            assert [
+                message for message in sent if message["type"] == "http.response.body"
+            ] == [
+                {
+                    "type": "http.response.body",
+                    "body": b"data: first event\r\n\r\n",
+                    "more_body": True,
+                }
+            ]
+            errors = [
+                record
+                for record in caplog.records
+                if record.name == "sse_starlette.sse"
+                and record.levelno == logging.ERROR
+            ]
+            assert len(errors) == int(cleanup_fails)
+            if cleanup_fails:
+                assert errors[0].exc_info[1] is cleanup_error
+        finally:
+            try:
+                await publisher.aclose()
+            except RuntimeError as exc:
+                # Clean up a failing baseline without masking the assertion.
+                if exc is not cleanup_error:
+                    raise
+
+    @pytest.mark.anyio
     @pytest.mark.parametrize("buffer_size", [0, 1, 10])
     async def test_send_whenClientDisconnectsWithMemoryChannel_thenProducerIsCancelledCleanly(
         self, buffer_size
