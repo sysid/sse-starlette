@@ -402,6 +402,8 @@ class ConnectionLimiter:
         return LimitedEventSourceResponse(generate_events(), self.semaphore)
 ```
 
+See [the runnable connection-limit example](examples/08_connection_limits.py).
+
 Reuse one limiter across the routes that share the limit. The permit is released
 as the response call exits, including disconnect/error paths. It also covers any
 background task that runs. This bounds active responses within one worker/event
