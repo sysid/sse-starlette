@@ -355,6 +355,14 @@ class EventSourceResponse(Response):
         self._cleanup_timeout = cleanup_timeout
 
         self.active = True
+        # Response lifecycle, so a stream cut short by the exit signal can still be
+        # ended with the closing empty body. _send_interrupted marks a send that never
+        # returned (stalled peer, timeout, send error): the transport is then in an
+        # unknown state and another send could block shutdown, so none is attempted.
+        self._response_started = False
+        self._response_complete = False
+        self._client_disconnected = False
+        self._send_interrupted = False
         # https://github.com/sysid/sse-starlette/pull/55#issuecomment-1732374113
         self._send_lock = anyio.Lock()
 
@@ -375,10 +383,15 @@ class EventSourceResponse(Response):
 
     async def _send_with_timeout(self, send: Send, message: Message) -> None:
         """Send one ASGI message, applying the response's per-send timeout."""
-        with anyio.move_on_after(self.send_timeout) as cancel_scope:
-            await send(message)
+        try:
+            with anyio.move_on_after(self.send_timeout) as cancel_scope:
+                await send(message)
+        except BaseException:
+            self._send_interrupted = True
+            raise
 
         if cancel_scope and cancel_scope.cancel_called:
+            self._send_interrupted = True
             raise SendTimeoutError()
 
     async def _stream_response(self, send: Send) -> None:
@@ -390,6 +403,7 @@ class EventSourceResponse(Response):
                 "headers": self.raw_headers,
             }
         )
+        self._response_started = True
 
         async for data in self.body_iterator:
             try:
@@ -423,8 +437,19 @@ class EventSourceResponse(Response):
                 raise
 
         async with self._send_lock:
+            # Flip `active` only after the closing send returns. If it flipped first,
+            # _listen_for_disconnect could wake on any non-disconnect message during
+            # that send, see active=False, return, and cancel_on_finish would cancel
+            # the closing send itself.
+            try:
+                await send(
+                    {"type": "http.response.body", "body": b"", "more_body": False}
+                )
+            except BaseException:
+                self._send_interrupted = True
+                raise
+            self._response_complete = True
             self.active = False
-            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
     async def _listen_for_disconnect(self, receive: Receive) -> None:
         """Watch for a disconnect message from the client.
@@ -438,6 +463,7 @@ class EventSourceResponse(Response):
             message = await receive()
             if message["type"] == "http.disconnect":
                 self.active = False
+                self._client_disconnected = True
                 logger.debug("Got event: http.disconnect. Stop streaming.")
                 if self.client_close_handler_callable:
                     await self.client_close_handler_callable(message)
@@ -597,6 +623,28 @@ class EventSourceResponse(Response):
                 task_group.start_soon(
                     cancel_on_finish, lambda: self._listen_for_disconnect(receive)
                 )
+
+        # The exit signal cancels _stream_response while it waits for the next event,
+        # before it sends the closing body. Without one the ASGI server sees a started
+        # response that never finished: uvicorn logs "ASGI callable returned without
+        # completing response" and the client gets a truncated chunked body instead
+        # of a clean end of stream.
+        if (
+            self._response_started
+            and not self._response_complete
+            and not self._client_disconnected
+            and not self._send_interrupted
+        ):
+            try:
+                await self._send_with_timeout(
+                    send,
+                    {"type": "http.response.body", "body": b"", "more_body": False},
+                )
+                self._response_complete = True
+            except OSError:
+                # Best effort during shutdown: ASGI 2.4 servers raise OSError when the
+                # peer has already gone, and SendTimeoutError is an OSError too.
+                pass
 
         if self.background is not None:
             await self.background()
