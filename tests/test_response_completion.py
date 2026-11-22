@@ -21,6 +21,7 @@ import httpx2 as httpx
 import pytest
 import uvicorn
 from starlette.applications import Starlette
+from starlette.background import BackgroundTask
 from starlette.routing import Route
 
 from sse_starlette.sse import AppStatus, EventSourceResponse
@@ -138,6 +139,65 @@ async def test_exitSignal_whenAlreadySetAtStart_thenResponseIsEmptyButComplete()
 
     assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
     assert sent[-1] == FINAL
+
+
+@pytest.mark.anyio
+async def test_exitSignal_whenClosingSendRaisesOSError_thenResponseEndsAndBackgroundRuns():
+    AppStatus.should_exit = True
+    sent = []
+    background_ran = False
+
+    async def send(message):
+        if message == FINAL:
+            # ASGI 2.4 servers raise OSError when the peer is already gone.
+            raise OSError("peer gone")
+        sent.append(message)
+
+    async def events():
+        await anyio.sleep_forever()
+        yield {"data": "never"}  # pragma: no cover
+
+    async def background():
+        nonlocal background_ran
+        background_ran = True
+
+    response = EventSourceResponse(
+        events(), ping=0, background=BackgroundTask(background)
+    )
+    with anyio.fail_after(2):
+        await response(SCOPE, _blocking_receive, send)
+
+    assert [m["type"] for m in sent] == ["http.response.start"]
+    assert background_ran, "a failed closing send must not skip the background task"
+
+
+@pytest.mark.anyio
+async def test_exitSignal_whenClosingSendStalls_thenSendTimeoutEndsResponseAndBackgroundRuns():
+    AppStatus.should_exit = True
+    sent = []
+    background_ran = False
+
+    async def send(message):
+        if message == FINAL:
+            await anyio.sleep_forever()  # stalled peer
+        sent.append(message)
+
+    async def events():
+        await anyio.sleep_forever()
+        yield {"data": "never"}  # pragma: no cover
+
+    async def background():
+        nonlocal background_ran
+        background_ran = True
+
+    response = EventSourceResponse(
+        events(), ping=0, send_timeout=0.1, background=BackgroundTask(background)
+    )
+    with anyio.fail_after(2):
+        await response(SCOPE, _blocking_receive, send)
+
+    assert [m["type"] for m in sent] == ["http.response.start"]
+    assert background_ran, "a timed-out closing send must not skip the background task"
 
 
 @pytest.mark.anyio
