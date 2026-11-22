@@ -194,13 +194,10 @@ def test_stop_server_with_many_consumers(caplog, server_command, min_lines, max_
         f"Expected {min_lines}..{max_lines} lines per consumer, got {line_counts}"
     )
 
-    # Then: Consumers report errors
+    # Then: every stream ends cleanly. A graceful shutdown (SIGTERM) sends the
+    # closing body (PR #235); before that, each consumer logged a
+    # RemoteProtocolError 'incomplete chunked read' here.
     time.sleep(0.5)
     errors = [r.message for r in caplog.records if r.levelname == "ERROR"]
-    assert len(errors) == N_CONSUMER, f"Expected {N_CONSUMER} errors, got {len(errors)}"
-    # consumers: 'peer closed connection without sending complete message body (incomplete chunked read)'
-    assert (
-        "peer closed connection without sending complete message body (incomplete chunked read)"
-        in errors
-    )
+    assert errors == [], f"Expected clean end of stream, got {errors}"
     time.sleep(0.2)
