@@ -19,6 +19,7 @@ Runnable examples demonstrating sse-starlette features.
 | [05_memory_channels.py](05_memory_channels.py) | Memory channels with `data_sender_callable` | uvicorn |
 | [06_send_timeout.py](06_send_timeout.py) | Frozen client detection via `send_timeout` | uvicorn |
 | [07_cooperative_shutdown.py](07_cooperative_shutdown.py) | Graceful shutdown with farewell events (v3.3.0) | uvicorn |
+| [08_connection_limits.py](08_connection_limits.py) | Limit active SSE responses across their streaming lifetime | uvicorn |
 
 ## Running
 
